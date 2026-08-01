@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>라인워치</title>
+<style>
+  :root{
+    --bg:#e9edf1;
+    --card:#ffffff;
+    --card2:#f4f6f8;
+    --line:#dde3e9;
+    --blue:#1f4e8c;
+    --blue-bright:#2f6fc4;
+    --text:#1c2530;
+    --text-dim:#6b7684;
+    --warn:#d6483f;
+    --amber:#e0a417;
+    --ok:#3f8f5f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:18px 14px 50px;
+    background:
+      linear-gradient(180deg,#f7f9fb 0%, var(--bg) 220px);
+    color:var(--text);
+    font-family:'Segoe UI','Pretendard',-apple-system,sans-serif;
+    max-width:480px; margin-left:auto; margin-right:auto;
+  }
+  .eyebrow{ font-size:.72rem; letter-spacing:.18em; color:var(--blue); text-transform:uppercase; font-weight:800; margin-bottom:4px; }
+  h1{ font-size:1.4rem; margin:0 0 16px; font-weight:800; letter-spacing:-.01em; color:var(--text); }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:12px;
+    box-shadow:0 1px 3px rgba(30,50,80,.06);
+  }
+  .card h2{ font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); margin:0 0 12px; font-weight:800; }
+
+  .sum-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:11px 12px; border-radius:9px; margin-bottom:7px;
+    background:var(--card2); border:1px solid var(--line);
+  }
+  .sum-row:last-child{ margin-bottom:0; }
+  .sum-row.urgent{ border-color:rgba(214,72,63,.5); background:rgba(214,72,63,.07); }
+  .sum-row.soon{ border-color:rgba(224,164,23,.5); background:rgba(224,164,23,.08); }
+  .sum-left .name{ font-size:.9rem; font-weight:800; }
+  .sum-left .kind{ font-size:.74rem; color:var(--text-dim); margin-top:1px; }
+  .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:1.05rem; text-align:right; white-space:nowrap; }
+  .sum-time.urgent{ color:var(--warn); }
+  .sum-time.soon{ color:#b3820f; }
+  .sum-time.ok{ color:var(--ok); }
+  .empty-msg{ color:var(--text-dim); font-size:.85rem; text-align:center; padding:10px 0; }
+
+  /* machine card */
+  details.machine{
+    background:var(--card);
+    border:1px solid var(--line); border-radius:14px;
+    margin-bottom:10px; overflow:hidden;
+    box-shadow:0 1px 3px rgba(30,50,80,.06);
+  }
+  details.machine > summary{
+    list-style:none; cursor:pointer; padding:14px 16px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-weight:800; font-size:1rem; background:linear-gradient(180deg,#f8fafc,#eef2f6);
+  }
+  details.machine > summary::-webkit-details-marker{ display:none; }
+  .m-name-input{ font-weight:800; font-size:1rem; border:0; background:transparent; color:var(--text); padding:2px 0; width:100%; }
+  .m-name-input:focus{ outline:none; border-bottom:1px dashed var(--blue); }
+  .m-name-label{ font-weight:800; font-size:1rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .arrow{ color:var(--text-dim); font-size:.8rem; transition:transform .15s; margin-left:8px; flex-shrink:0; }
+  details.machine[open] > summary .arrow{ transform:rotate(90deg); }
+  details.item[open] > summary .arrow{ transform:rotate(90deg); }
+  .m-del{ background:transparent;border:0;color:var(--text-dim);font-size:1rem;cursor:pointer;padding:2px 6px;margin-left:4px; }
+  .machine-body{ padding:12px 14px 14px; background:var(--card); }
+
+  .card-footer-actions{ display:flex; gap:8px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); justify-content:flex-end; }
+  .mini-btn{ padding:7px 12px; border-radius:7px; border:1px solid var(--line); background:#fff; color:var(--text-dim); font-size:.74rem; font-weight:700; cursor:pointer; }
+  .mini-btn-warn{ color:var(--warn); border-color:rgba(214,72,63,.35); }
+
+  /* item (sub) card */
+  details.item{
+    background:var(--card2); border:1px solid var(--line); border-radius:12px;
+    margin-bottom:10px; overflow:hidden;
+  }
+  details.item > summary{
+    list-style:none; cursor:pointer; padding:11px 13px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-weight:700; font-size:.9rem;
+  }
+  details.item > summary::-webkit-details-marker{ display:none; }
+  .item-body{ padding:0 13px 13px; }
+  .i-name-input{ font-weight:700; font-size:.9rem; border:0; background:transparent; color:var(--text); width:100%; }
+  .i-name-input:focus{ outline:none; border-bottom:1px dashed var(--blue); }
+  .i-name-label{ font-weight:700; font-size:.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .type-badge{ font-size:.68rem; padding:2px 7px; border-radius:20px; margin-left:6px; font-weight:700; white-space:nowrap; }
+  .type-badge.roll{ background:#e5edf9; color:var(--blue); }
+  .type-badge.container{ background:#e6f2ea; color:var(--ok); }
+
+  .sec-label{ font-size:.74rem; color:var(--text-dim); margin:10px 0 7px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+  .toggle{ display:flex; background:var(--card); border:1px solid var(--line); border-radius:9px; padding:3px; margin-bottom:10px; }
+  .toggle button{ flex:1; padding:8px 4px; background:transparent; border:0; border-radius:6px; color:var(--text-dim); font-size:.8rem; font-weight:700; cursor:pointer; }
+  .toggle button.active{ background:var(--blue); color:#fff; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .input-group{ margin-bottom:9px; }
+  .input-group label{ display:block; font-size:.72rem; color:var(--text-dim); margin-bottom:4px; }
+  input[type=number], input[type=text], select{
+    width:100%; padding:10px; background:#fff;
+    border:1px solid var(--line); border-radius:8px;
+    color:var(--text); font-size:.92rem; font-variant-numeric:tabular-nums;
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--blue); }
+  button.btn{ padding:10px; border:0; border-radius:8px; font-weight:800; cursor:pointer; font-size:.84rem; }
+  button.btn-blue{ background:linear-gradient(180deg,var(--blue-bright),var(--blue)); color:#fff; width:100%; margin-top:2px; }
+  button.btn-ghost{ background:#fff; color:var(--text-dim); border:1px solid var(--line); }
+  button.btn-add{ background:transparent; color:var(--blue); border:1.5px dashed var(--blue); border-radius:10px; padding:11px; width:100%; font-weight:800; cursor:pointer; font-size:.86rem; margin-top:4px;}
+
+  .result-box{ display:flex; gap:14px; align-items:center; margin-top:10px; padding:10px; background:#fff; border-radius:9px; border:1px solid var(--line); }
+  .result-box .big{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:1.25rem; color:var(--blue); }
+  .result-box .lbl{ font-size:.72rem; color:var(--text-dim); }
+
+  .cp-add{ display:flex; gap:6px; margin-top:6px; }
+  .cp-add input[type=text]{ flex:1.3; }
+  .cp-add input[type=number]{ flex:1; }
+  .cp-list{ margin-top:10px; display:grid; gap:6px; }
+  .cp-item{ display:flex; justify-content:space-between; align-items:center; padding:9px 10px; background:#fff; border-radius:8px; border:1px solid var(--line); }
+  .cp-item .cp-label{ font-size:.85rem; font-weight:700; }
+  .cp-item .cp-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:700; font-size:.84rem; margin-right:8px; }
+  .cp-del{ background:transparent; border:0; color:var(--text-dim); font-size:1rem; cursor:pointer; padding:2px 6px; }
+
+  .rate-helper{ background:#fff; border:1px dashed var(--line); border-radius:9px; padding:10px; margin-top:6px; }
+  .note{ font-size:.72rem; color:var(--text-dim); line-height:1.5; margin-top:10px; }
+  .item-del{ background:transparent;border:0;color:var(--text-dim);font-size:.95rem;cursor:pointer;padding:2px 6px; }
+
+  #auth-card{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  #auth-card input{ flex:1; min-width:120px; }
+  #auth-card .btn{ width:auto; padding:10px 16px; }
+  .auth-status{ font-size:.8rem; color:var(--text-dim); font-weight:700; }
+  .auth-status.on{ color:var(--ok); }
+  body.readonly .btn, body.readonly .btn-add, body.readonly select,
+  body.readonly .mini-btn, body.readonly input[type=number]{
+    pointer-events:none; opacity:.45;
+  }
+</style>
+</head>
+<body>
+
+  <div class="eyebrow">Production Line Monitor</div>
+  <h1>라인워치</h1>
+
+  <div class="card" id="auth-card">
+    <div id="auth-logged-out" style="display:flex; gap:8px; flex:1; flex-wrap:wrap;">
+      <input type="email" id="login-email" placeholder="이메일">
+      <input type="password" id="login-pw" placeholder="비밀번호">
+      <button class="btn btn-blue" id="login-btn">로그인 (입력 권한)</button>
+    </div>
+    <div id="auth-logged-in" class="hidden" style="display:none; align-items:center; gap:10px;">
+      <span class="auth-status on">✓ 입력 가능 모드</span>
+      <button class="btn btn-ghost" id="logout-btn">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>지금 확인할 순서</h2>
+    <div id="summary-list"><div class="empty-msg">기계와 항목을 추가하고 계산하면 여기에 표시됩니다</div></div>
+  </div>
+
+  <div id="machines-container"></div>
+  <button class="btn-add" id="add-machine">+ 기계 추가</button>
+
+  <!-- Firebase (compat SDK) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script>
+    // ▼▼▼ Firebase 콘솔에서 만든 프로젝트의 설정값 6개를 여기에 붙여넣으세요 ▼▼▼
+    // 프로젝트 설정(톱니바퀴) > 일반 > 내 앱 > SDK 설정 및 구성 에서 복사
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsGIh79ZHulWJpt_aHPEgHtmgDWUFPMsE",
+      authDomain: "line-watch-b0060.firebaseapp.com",
+      projectId: "line-watch-b0060",
+      storageBucket: "line-watch-b0060.firebasestorage.app",
+      messagingSenderId: "61330552182",
+      appId: "1:61330552182:web:3fc85c6ad0845f7f7c3657"
+    };
+    // ▲▲▲ 여기까지 ▲▲▲
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const STATE_DOC = db.collection('linewatch').doc('state');
+  </script>
+
+<script>
+const STORAGE_KEY = 'linewatch_v1'; // 오프라인 캐시 백업용으로만 사용
+const $ = (id) => document.getElementById(id);
+const uid = (p) => p + Date.now() + Math.random().toString(36).slice(2,6);
+
+function defaultRollItem(label){
+  return { id: uid('it'), type:'roll', label,
+    core_mm:76.2, t_um:12, L_total:6100, H:30, speed:50,
+    rollTarget:null, rollRemainM:null, rollRatio:null, checkpoints:[] };
+}
+function defaultContainerItem(label){
+  return { id: uid('it'), type:'container', label,
+    curH:null, rate:null, minH:50, target:null };
+}
+function defaultMachine(no){
+  return { id: uid('m'), no, items:[ defaultRollItem('뚜껑'), defaultRollItem('바닥') ] };
+}
+
+let state = { machines: [] };
+let firestoreReady = false;
+
+// 오프라인 대비: 로컬 캐시를 먼저 읽어 즉시 화면을 채우고, Firestore 연결되면 그걸로 덮어씀
+(function loadLocalCache(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){ state = JSON.parse(raw); }
+  }catch(e){}
+})();
+
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  if(firestoreReady){
+    STATE_DOC.set(state).catch(err=>console.error('Firestore 저장 실패:', err));
+  }
+}
+
+// 실시간 동기화: 누군가 데이터를 바꾸면 모든 화면이 자동으로 갱신됨
+STATE_DOC.onSnapshot((doc)=>{
+  firestoreReady = true;
+  if(doc.exists){
+    state = doc.data();
+  }else{
+    // 문서가 아직 없으면 현재 로컬 상태로 최초 생성
+    STATE_DOC.set(state).catch(err=>console.error('Firestore 초기화 실패:', err));
+  }
+  renderAll();
+}, (err)=>{
+  console.error('Firestore 연결 오류:', err);
+});
+
+// ---- 로그인 (입력 권한) ----
+auth.onAuthStateChanged((user)=>{
+  const loggedIn = !!user;
+  document.body.classList.toggle('readonly', !loggedIn);
+  $('auth-logged-out').style.display = loggedIn ? 'none' : 'flex';
+  $('auth-logged-in').style.display = loggedIn ? 'flex' : 'none';
+});
+$('login-btn').addEventListener('click', ()=>{
+  const email = $('login-email').value.trim();
+  const pw = $('login-pw').value;
+  if(!email || !pw){ alert('이메일과 비밀번호를 입력하세요.'); return; }
+  auth.signInWithEmailAndPassword(email, pw)
+    .then(()=>{ $('login-pw').value=''; })
+    .catch(err=>alert('로그인 실패: '+err.message));
+});
+$('logout-btn').addEventListener('click', ()=> auth.signOut());
+
+function findMachine(mid){ return state.machines.find(m=>m.id===mid); }
+function findItem(mid,iid){ return findMachine(mid).items.find(i=>i.id===iid); }
+function findMachineIdByItem(iid){
+  const m = state.machines.find(m=>m.items.some(i=>i.id===iid));
+  return m ? m.id : null;
+}
+
+/* ---------- calc helpers ---------- */
+function distanceToCheckpoint(it, H_cp){
+  if(!(H_cp>=0) || H_cp >= it.H) return null;
+  const t_mm = it.t_um/1000, r0 = it.core_mm/2;
+  const R = r0+it.H, R_cp = r0+H_cp;
+  return Math.PI*(Math.pow(R,2)-Math.pow(R_cp,2)) / t_mm / 1000;
+}
+function recomputeCheckpoints(it){
+  const now = Date.now();
+  it.checkpoints.forEach(cp=>{
+    const dist = distanceToCheckpoint(it, cp.H_cp);
+    if(dist===null){ cp.target=now; cp.distM=null; cp.invalid=true; }
+    else{ cp.target = now + (dist/it.speed)*60000; cp.distM=dist; cp.invalid=false; }
+  });
+}
+function fmtCountdown(targetMs){
+  const diff = targetMs - Date.now();
+  const past = diff <= 0;
+  const abs = Math.abs(diff);
+  const totalSec = Math.floor(abs/1000);
+  const h = Math.floor(totalSec/3600), m = Math.floor((totalSec%3600)/60);
+  const sstr = h>0 ? `${h}시간 ${m}분` : `${m}분`;
+  let tier = past ? 'urgent' : (diff < 10*60000 ? 'urgent' : (diff < 30*60000 ? 'soon' : 'ok'));
+  return { text: past ? '지금 확인!' : sstr+' 후', tier };
+}
+
+/* ---------- rendering ---------- */
+function itemBodyHTML(m, it){
+  if(it.type==='roll'){
+    return `
+      <div class="sec-label">롤 규격</div>
+      <div class="input-group">
+        <div class="toggle">
+          <button type="button" data-act="core3" data-m="${m.id}" data-i="${it.id}" class="c3-${it.id} ${it.core_mm===76.2?'active':''}">3인치 (76.2mm)</button>
+          <button type="button" data-act="core6" data-m="${m.id}" data-i="${it.id}" class="c6-${it.id} ${it.core_mm===152.4?'active':''}">6인치 (152.4mm)</button>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="input-group"><label>원단 두께 (µm)</label><input type="number" id="t_${it.id}" value="${it.t_um??''}"></div>
+        <div class="input-group"><label>초기 총 길이 (m)</label><input type="number" id="L_${it.id}" value="${it.L_total??''}"></div>
+      </div>
+      <div class="sec-label">현재 상태</div>
+      <div class="row2">
+        <div class="input-group"><label>쌓인 두께 H (mm)</label><input type="number" id="H_${it.id}" value="${it.H??''}"></div>
+        <div class="input-group"><label>생산속도 (m/min)</label><input type="number" id="speed_${it.id}" value="${it.speed??''}"></div>
+      </div>
+      <button class="btn btn-blue" data-act="calcroll" data-m="${m.id}" data-i="${it.id}">롤 계산 업데이트</button>
+      <div class="result-box" id="rollres_${it.id}" style="display:${it.rollTarget?'flex':'none'};">
+        <div style="flex:1;"><div class="big" id="rollres_time_${it.id}">–</div><div class="lbl">예상 롤 교체까지</div></div>
+        <div style="text-align:right;">
+          <div class="lbl" id="rollres_len_${it.id}">남은 – m</div>
+          <div class="lbl" id="rollres_ratio_${it.id}" style="margin-top:2px;">잔량 – %</div>
+        </div>
+      </div>
+      <div class="sec-label">이음매 · 불량구간 체크포인트</div>
+      <div class="cp-add">
+        <input type="text" id="cplabel_${it.id}" placeholder="예: 이음매(초록테잎)">
+        <input type="number" id="cpdist_${it.id}" placeholder="쌓인 높이 mm">
+        <button class="btn btn-ghost" data-act="addcp" data-m="${m.id}" data-i="${it.id}">추가</button>
+      </div>
+      <div class="cp-list" id="cplist_${it.id}"></div>
+      <div class="note">롤 측면에서 지관부터 삽지/실리콘테잎 위치까지 쌓인 높이(mm)를 재서 입력하세요. "롤 계산 업데이트"를 누르면 체크포인트도 함께 다시 계산됩니다.</div>
+    `;
+  }else{
+    return `
+      <div class="sec-label">현재 상태</div>
+      <div class="row2">
+        <div class="input-group"><label>현재 높이 (mm, 바닥부터)</label><input type="number" id="curH_${it.id}" value="${it.curH??''}"></div>
+        <div class="input-group"><label>소모속도 (mm/시간)</label><input type="number" id="rate_${it.id}" value="${it.rate??''}"></div>
+      </div>
+      <div class="input-group"><label>교체 기준 높이 (mm, 바닥에서 남겨야 하는 최소)</label><input type="number" id="minH_${it.id}" value="${it.minH??50}"></div>
+      <button class="btn btn-blue" data-act="calccontainer" data-m="${m.id}" data-i="${it.id}">계산 업데이트</button>
+      <div class="result-box" id="contres_${it.id}" style="display:${it.target?'flex':'none'};">
+        <div style="flex:1;"><div class="big" id="contres_time_${it.id}">–</div><div class="lbl">예상 교체까지</div></div>
+      </div>
+      <div class="sec-label">소모속도 모를 때 (자동 계산)</div>
+      <div class="rate-helper">
+        <div class="row3">
+          <div class="input-group"><label>이전 높이(mm)</label><input type="number" id="prevH_${it.id}"></div>
+          <div class="input-group"><label>지난 시간(시간)</label><input type="number" id="elapsedH_${it.id}"></div>
+          <div class="input-group"><label>지금 높이(mm)</label><input type="number" id="nowH_${it.id}"></div>
+        </div>
+        <button class="btn btn-ghost" style="width:100%;" data-act="calcrate" data-m="${m.id}" data-i="${it.id}">속도 계산해서 적용</button>
+      </div>
+      <div class="note">용기 지름은 필요 없습니다 — 높이가 시간당 얼마나 줄어드는지만 알면 됩니다.</div>
+    `;
+  }
+}
+
+function itemHTML(m, it){
+  const typeLabel = it.type==='roll' ? '원단롤' : '점착제통';
+  const badgeClass = it.type==='roll' ? 'roll' : 'container';
+  return `
+  <details class="item" ${openItemsSet.has(it.id)?'open':''} id="det-${it.id}">
+    <summary>
+      <span style="display:flex;align-items:center;flex:1;min-width:0;">
+        <span class="i-name-label">${it.label}</span>
+        <span class="type-badge ${badgeClass}">${typeLabel}</span>
+      </span>
+      <span class="arrow">▶</span>
+    </summary>
+    <div class="item-body">
+      ${itemBodyHTML(m, it)}
+      <div class="card-footer-actions">
+        <button class="mini-btn" data-act="rename" data-m="${m.id}" data-i="${it.id}">이름 수정</button>
+        <button class="mini-btn mini-btn-warn" data-act="delitem" data-m="${m.id}" data-i="${it.id}">항목 삭제</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+let closedMachines = new Set(); // machine ids the user has collapsed
+let openItemsSet = new Set();   // item ids the user has expanded (default closed)
+
+function machineHTML(m){
+  const isOpen = !closedMachines.has(m.id);
+  return `
+  <details class="machine" ${isOpen?'open':''} id="det-${m.id}">
+    <summary>
+      <span class="m-name-label">${m.no}</span>
+      <span class="arrow">▶</span>
+    </summary>
+    <div class="machine-body">
+      <div id="items_${m.id}">${m.items.map(it=>itemHTML(m,it)).join('')}</div>
+      <select id="newtype_${m.id}" style="margin-top:8px;">
+        <option value="roll">원단롤</option>
+        <option value="container">점착제통</option>
+      </select>
+      <button class="btn-add" data-act="additem" data-m="${m.id}">+ 항목 추가</button>
+      <div class="card-footer-actions">
+        <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">이름 수정</button>
+        <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">기계 삭제</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+function renderMachines(){
+  $('machines-container').innerHTML = state.machines.map(machineHTML).join('');
+  document.querySelectorAll('details.machine').forEach(d=>{
+    const mid = d.id.replace('det-','');
+    d.addEventListener('toggle', ()=>{ d.open ? closedMachines.delete(mid) : closedMachines.add(mid); });
+  });
+  document.querySelectorAll('details.item').forEach(d=>{
+    const iid = d.id.replace('det-','');
+    d.addEventListener('toggle', ()=>{ d.open ? openItemsSet.add(iid) : openItemsSet.delete(iid); });
+  });
+}
+
+function renderSummary(){
+  const entries = [];
+  state.machines.forEach(m=>{
+    m.items.forEach(it=>{
+      if(it.type==='roll'){
+        if(it.rollTarget) entries.push({name:`${m.no} · ${it.label}`, kind:'롤 교체', target:it.rollTarget});
+        it.checkpoints.forEach(cp=>entries.push({name:`${m.no} · ${it.label}`, kind:cp.label, target:cp.target, invalid:cp.invalid}));
+      }else{
+        if(it.target) entries.push({name:`${m.no} · ${it.label}`, kind:'약품 교체', target:it.target});
+      }
+    });
+  });
+  entries.sort((a,b)=>a.target-b.target);
+  const el = $('summary-list');
+  if(!entries.length){ el.innerHTML = '<div class="empty-msg">기계와 항목을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
+  el.innerHTML = entries.map(en=>{
+    let {text,tier} = fmtCountdown(en.target);
+    if(en.invalid){ text='확인 필요'; tier='urgent'; }
+    return `<div class="sum-row ${tier==='urgent'?'urgent':(tier==='soon'?'soon':'')}">
+      <div class="sum-left"><div class="name">${en.name}</div><div class="kind">${en.kind}</div></div>
+      <div class="sum-time ${tier}">${text}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderCpList(it){
+  const wrap = $(`cplist_${it.id}`);
+  if(!wrap) return;
+  if(!it.checkpoints.length){ wrap.innerHTML=''; return; }
+  const mid = findMachineIdByItem(it.id);
+  wrap.innerHTML = it.checkpoints.map(cp=>{
+    const {text} = fmtCountdown(cp.target);
+    const shown = cp.invalid ? '확인 필요' : text;
+    const distText = (!cp.invalid && cp.distM!=null) ? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음 · ` : '';
+    return `<div class="cp-item">
+      <span class="cp-label">${cp.label}<span style="color:var(--text-dim);font-weight:400;"> · H ${cp.H_cp}mm</span></span>
+      <span style="display:flex;align-items:center;">
+        <span class="cp-time" id="cptime_${cp.id}">${distText}${shown}</span>
+        <button class="cp-del" data-act="delcp" data-m="${mid}" data-i="${it.id}" data-cp="${cp.id}">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function renderAll(){
+  renderMachines();
+  state.machines.forEach(m=>m.items.forEach(it=>{ if(it.type==='roll') renderCpList(it); }));
+  renderSummary();
+}
+
+/* ---------- actions ---------- */
+function calcRoll(mid, iid){
+  const it = findItem(mid,iid);
+  const t_um = parseFloat($(`t_${iid}`).value);
+  const L_total = parseFloat($(`L_${iid}`).value);
+  const H = parseFloat($(`H_${iid}`).value);
+  const speed = parseFloat($(`speed_${iid}`).value);
+  if(!(t_um>0) || !(H>=0) || !(speed>0)){ alert('두께 / 쌓인 두께 / 생산속도를 확인해주세요.'); return; }
+  it.t_um=t_um; it.L_total=L_total; it.H=H; it.speed=speed;
+  const t_mm=t_um/1000, r0=it.core_mm/2, R=r0+H;
+  const Area = Math.PI*(Math.pow(R,2)-Math.pow(r0,2));
+  const remainM = Area/t_mm/1000;
+  const remainMin = remainM/speed;
+  it.rollRemainM=remainM;
+  it.rollRatio = (L_total>0)? remainM/L_total*100 : null;
+  it.rollTarget = Date.now() + remainMin*60000;
+  recomputeCheckpoints(it);
+  saveState();
+  renderAll();
+}
+function addCheckpoint(mid, iid){
+  const it = findItem(mid,iid);
+  const labelEl = $(`cplabel_${iid}`), hEl = $(`cpdist_${iid}`);
+  const label = labelEl.value.trim(), H_cp = parseFloat(hEl.value);
+  if(!label){ alert('체크포인트 이름을 입력해주세요.'); return; }
+  if(!it.rollTarget){ alert('먼저 "롤 계산 업데이트"를 한 번 눌러주세요.'); return; }
+  if(!(H_cp>=0)){ alert('지관부터 쌓인 높이(mm)를 입력해주세요.'); return; }
+  if(H_cp >= it.H){ alert('입력한 높이가 현재 쌓인 두께(H)보다 크거나 같습니다.'); return; }
+  const dist = distanceToCheckpoint(it, H_cp);
+  it.checkpoints.push({ id:uid('cp'), label, H_cp, distM:dist, target: Date.now()+(dist/it.speed)*60000, invalid:false });
+  saveState();
+  renderAll();
+}
+function calcContainer(mid, iid){
+  const it = findItem(mid,iid);
+  const curH = parseFloat($(`curH_${iid}`).value);
+  const rate = parseFloat($(`rate_${iid}`).value);
+  const minH = parseFloat($(`minH_${iid}`).value);
+  if(!(curH>=0) || !(rate>0) || !(minH>=0)){ alert('현재 높이 / 소모속도 / 교체 기준 높이를 확인해주세요.'); return; }
+  if(curH <= minH){ alert('현재 높이가 이미 교체 기준 높이 이하입니다. 지금 교체하세요.'); }
+  it.curH=curH; it.rate=rate; it.minH=minH;
+  const remainH = Math.max(0, curH-minH);
+  const remainHours = remainH/rate;
+  it.target = Date.now() + remainHours*3600000;
+  saveState();
+  renderAll();
+}
+function calcRate(mid, iid){
+  const prevH = parseFloat($(`prevH_${iid}`).value);
+  const elapsed = parseFloat($(`elapsedH_${iid}`).value);
+  const nowH = parseFloat($(`nowH_${iid}`).value);
+  if(!(prevH>=0) || !(elapsed>0) || !(nowH>=0) || nowH>prevH){ alert('값을 확인해주세요 (지금 높이는 이전 높이보다 작아야 합니다).'); return; }
+  const rate = (prevH-nowH)/elapsed;
+  $(`rate_${iid}`).value = rate.toFixed(2);
+  $(`curH_${iid}`).value = nowH;
+}
+
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const act = btn.dataset.act;
+  const mid = btn.dataset.m, iid = btn.dataset.i;
+  if(act==='core3'){ findItem(mid,iid).core_mm=76.2; saveState(); renderAll(); }
+  else if(act==='core6'){ findItem(mid,iid).core_mm=152.4; saveState(); renderAll(); }
+  else if(act==='renamemachine'){
+    const m = findMachine(mid);
+    const name = prompt('기계 번호를 입력하세요', m.no);
+    if(name!==null && name.trim()){ m.no = name.trim(); saveState(); renderAll(); }
+  }
+  else if(act==='rename'){
+    const it = findItem(mid,iid);
+    const name = prompt('항목 이름을 입력하세요', it.label);
+    if(name!==null && name.trim()){ it.label = name.trim(); saveState(); renderAll(); }
+  }
+  else if(act==='calcroll'){ calcRoll(mid,iid); }
+  else if(act==='addcp'){ addCheckpoint(mid,iid); }
+  else if(act==='delcp'){ const it=findItem(mid,iid); it.checkpoints=it.checkpoints.filter(c=>c.id!==btn.dataset.cp); saveState(); renderAll(); }
+  else if(act==='calccontainer'){ calcContainer(mid,iid); }
+  else if(act==='calcrate'){ calcRate(mid,iid); }
+  else if(act==='delitem'){
+    if(confirm('이 항목을 삭제할까요?')){ const m=findMachine(mid); m.items=m.items.filter(i=>i.id!==iid); saveState(); renderAll(); }
+  }
+  else if(act==='delmachine'){
+    e.stopPropagation();
+    if(confirm('이 기계와 하위 항목을 모두 삭제할까요?')){ state.machines=state.machines.filter(m=>m.id!==mid); saveState(); renderAll(); }
+  }
+  else if(act==='additem'){
+    const type = $(`newtype_${mid}`).value;
+    const typeLabel = type==='roll' ? '원단롤' : '점착제통';
+    const name = prompt('항목 이름을 입력하세요 (예: 뚜껑, 바닥, 점착제A)', '');
+    if(name===null) return;
+    const m = findMachine(mid);
+    const label = name.trim() || typeLabel;
+    m.items.push(type==='roll' ? defaultRollItem(label) : defaultContainerItem(label));
+    saveState(); renderAll();
+  }
+});
+document.addEventListener('click', (e)=>{
+  if(e.target.dataset && e.target.dataset.act==='delmachine'){ e.stopPropagation(); }
+});
+$('add-machine').addEventListener('click', ()=>{
+  const no = prompt('기계 번호를 입력하세요 (예: 22호기)');
+  if(no===null) return;
+  state.machines.push(defaultMachine(no.trim() || '새 기계'));
+  saveState(); renderAll();
+});
+document.addEventListener('change', (e)=>{
+  if(e.target.dataset && e.target.dataset.act==='rename'){
+    findItem(e.target.dataset.m, e.target.dataset.i).label = e.target.value;
+    saveState();
+  }
+  if(e.target.dataset && e.target.dataset.act==='renamemachine'){
+    findMachine(e.target.dataset.m).no = e.target.value;
+    saveState();
+  }
+});
+document.addEventListener('click', (e)=>{
+  if(e.target.matches('.m-name-input, .i-name-input')) e.stopPropagation();
+});
+
+function tick(){
+  renderSummary();
+  state.machines.forEach(m=>m.items.forEach(it=>{
+    if(it.type==='roll'){
+      if(it.rollTarget){ const el=$(`rollres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.rollTarget).text; }
+      it.checkpoints.forEach(cp=>{ const el=$(`cptime_${cp.id}`); if(el){
+        if(cp.invalid) el.textContent='확인 필요';
+        else{ const d = cp.distM!=null? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음 · `:''; el.textContent = d+fmtCountdown(cp.target).text; }
+      }});
+    }else{
+      if(it.target){ const el=$(`contres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.target).text; }
+    }
+  }));
+}
+
+renderAll();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
