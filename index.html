@@ -138,6 +138,10 @@
 
   .rate-helper{ background:#fff; border:1px dashed var(--line); border-radius:9px; padding:10px; margin-top:6px; }
   .note{ font-size:.72rem; color:var(--text-dim); line-height:1.5; margin-top:10px; }
+  .preview-hint{ font-size:.76rem; color:var(--blue); font-weight:700; margin-top:5px; }
+  .pause-badge{ font-size:.68rem; font-weight:700; color:#8a6d1a; background:#fbeecb; border:1px solid #f0d998; border-radius:20px; padding:2px 8px; margin-left:6px; white-space:nowrap; }
+  .sum-row.paused{ opacity:.65; border-style:dashed; }
+  .sum-time.paused{ color:var(--text-dim); font-size:.85rem; }
   .item-del{ background:transparent;border:0;color:var(--text-dim);font-size:.95rem;cursor:pointer;padding:2px 6px; }
 
   #auth-card{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -216,7 +220,7 @@ function defaultContainerItem(label){
     curH:null, rate:null, minH:50, target:null };
 }
 function defaultMachine(no){
-  return { id: uid('m'), no, items:[ defaultRollItem('뚜껑'), defaultRollItem('바닥') ] };
+  return { id: uid('m'), no, paused:false, pausedAt:null, items:[ defaultRollItem('뚜껑'), defaultRollItem('바닥') ] };
 }
 
 let state = { machines: [] };
@@ -276,6 +280,13 @@ function findMachineIdByItem(iid){
 }
 
 /* ---------- calc helpers ---------- */
+function rollRemainingM(core_mm, t_um, H){
+  if(!(t_um>0) || !(H>=0) || !(core_mm>0)) return null;
+  const t_mm = t_um/1000, r0 = core_mm/2, R = r0+H;
+  return Math.PI*(Math.pow(R,2)-Math.pow(r0,2)) / t_mm / 1000;
+}
+function fmtM(v){ return v==null ? '–' : v.toLocaleString(undefined,{maximumFractionDigits:1})+' m'; }
+
 function distanceToCheckpoint(it, H_cp){
   if(!(H_cp>=0) || H_cp >= it.H) return null;
   const t_mm = it.t_um/1000, r0 = it.core_mm/2;
@@ -290,13 +301,19 @@ function recomputeCheckpoints(it){
     else{ cp.target = now + (dist/it.speed)*60000; cp.distM=dist; cp.invalid=false; }
   });
 }
-function fmtCountdown(targetMs){
-  const diff = targetMs - Date.now();
+function nowFor(m){ return (m && m.paused && m.pausedAt) ? m.pausedAt : Date.now(); }
+
+function fmtCountdown(targetMs, refNow, paused){
+  refNow = refNow ?? Date.now();
+  const diff = targetMs - refNow;
   const past = diff <= 0;
   const abs = Math.abs(diff);
   const totalSec = Math.floor(abs/1000);
   const h = Math.floor(totalSec/3600), m = Math.floor((totalSec%3600)/60);
   const sstr = h>0 ? `${h}시간 ${m}분` : `${m}분`;
+  if(paused){
+    return { text: '⏸ '+(past?'0분':sstr)+' 남음 (일시정지)', tier:'paused' };
+  }
   let tier = past ? 'urgent' : (diff < 10*60000 ? 'urgent' : (diff < 30*60000 ? 'soon' : 'ok'));
   return { text: past ? '지금 확인!' : sstr+' 후', tier };
 }
@@ -313,12 +330,16 @@ function itemBodyHTML(m, it){
         </div>
       </div>
       <div class="row2">
-        <div class="input-group"><label>원단 두께 (µm)</label><input type="number" id="t_${it.id}" value="${it.t_um??''}"></div>
+        <div class="input-group"><label>원단 두께 (µm)</label><input type="number" id="t_${it.id}" value="${it.t_um??''}" data-act="hpreview" data-i="${it.id}"></div>
         <div class="input-group"><label>초기 총 길이 (m)</label><input type="number" id="L_${it.id}" value="${it.L_total??''}"></div>
       </div>
       <div class="sec-label">현재 상태</div>
       <div class="row2">
-        <div class="input-group"><label>쌓인 두께 H (mm)</label><input type="number" id="H_${it.id}" value="${it.H??''}"></div>
+        <div class="input-group">
+          <label>쌓인 두께 H (mm)</label>
+          <input type="number" id="H_${it.id}" value="${it.H??''}" data-act="hpreview" data-i="${it.id}">
+          <div class="preview-hint" id="hpreview_${it.id}">예상 잔량: ${fmtM(rollRemainingM(it.core_mm, it.t_um, it.H))}</div>
+        </div>
         <div class="input-group"><label>생산속도 (m/min)</label><input type="number" id="speed_${it.id}" value="${it.speed??''}"></div>
       </div>
       <button class="btn btn-blue" data-act="calcroll" data-m="${m.id}" data-i="${it.id}">롤 계산 업데이트</button>
@@ -394,7 +415,7 @@ function machineHTML(m){
   return `
   <details class="machine" ${isOpen?'open':''} id="det-${m.id}">
     <summary>
-      <span class="m-name-label">${m.no}</span>
+      <span class="m-name-label">${m.no}${m.paused?' <span class=\"pause-badge\">⏸ 일시정지</span>':''}</span>
       <span class="arrow">▶</span>
     </summary>
     <div class="machine-body">
@@ -404,6 +425,9 @@ function machineHTML(m){
         <option value="container">점착제통</option>
       </select>
       <button class="btn-add" data-act="additem" data-m="${m.id}">+ 항목 추가</button>
+      <button class="btn ${m.paused?'btn-blue':'btn-ghost'}" style="width:100%;margin-top:8px;" data-act="togglepause" data-m="${m.id}">
+        ${m.paused ? '▶ 가동 재개 (타이머 이어서 진행)' : '⏸ 가동 일시정지 (원단·부품 교체 중)'}
+      </button>
       <div class="card-footer-actions">
         <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">이름 수정</button>
         <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">기계 삭제</button>
@@ -429,10 +453,10 @@ function renderSummary(){
   state.machines.forEach(m=>{
     m.items.forEach(it=>{
       if(it.type==='roll'){
-        if(it.rollTarget) entries.push({name:`${m.no} · ${it.label}`, kind:'롤 교체', target:it.rollTarget});
-        it.checkpoints.forEach(cp=>entries.push({name:`${m.no} · ${it.label}`, kind:cp.label, target:cp.target, invalid:cp.invalid}));
+        if(it.rollTarget) entries.push({name:`${m.no} · ${it.label}`, kind:`롤 교체${it.rollRemainM!=null?' · 약 '+it.rollRemainM.toLocaleString(undefined,{maximumFractionDigits:0})+'m 남음':''}`, target:it.rollTarget, m});
+        it.checkpoints.forEach(cp=>entries.push({name:`${m.no} · ${it.label}`, kind:cp.label, target:cp.target, invalid:cp.invalid, m}));
       }else{
-        if(it.target) entries.push({name:`${m.no} · ${it.label}`, kind:'약품 교체', target:it.target});
+        if(it.target) entries.push({name:`${m.no} · ${it.label}`, kind:'약품 교체', target:it.target, m});
       }
     });
   });
@@ -440,9 +464,9 @@ function renderSummary(){
   const el = $('summary-list');
   if(!entries.length){ el.innerHTML = '<div class="empty-msg">기계와 항목을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
   el.innerHTML = entries.map(en=>{
-    let {text,tier} = fmtCountdown(en.target);
-    if(en.invalid){ text='확인 필요'; tier='urgent'; }
-    return `<div class="sum-row ${tier==='urgent'?'urgent':(tier==='soon'?'soon':'')}">
+    let {text,tier} = fmtCountdown(en.target, nowFor(en.m), en.m.paused);
+    if(en.invalid && !en.m.paused){ text='확인 필요'; tier='urgent'; }
+    return `<div class="sum-row ${tier==='urgent'?'urgent':(tier==='soon'?'soon':(tier==='paused'?'paused':''))}">
       <div class="sum-left"><div class="name">${en.name}</div><div class="kind">${en.kind}</div></div>
       <div class="sum-time ${tier}">${text}</div>
     </div>`;
@@ -454,8 +478,9 @@ function renderCpList(it){
   if(!wrap) return;
   if(!it.checkpoints.length){ wrap.innerHTML=''; return; }
   const mid = findMachineIdByItem(it.id);
+  const m = findMachine(mid);
   wrap.innerHTML = it.checkpoints.map(cp=>{
-    const {text} = fmtCountdown(cp.target);
+    const {text} = fmtCountdown(cp.target, nowFor(m), m.paused);
     const shown = cp.invalid ? '확인 필요' : text;
     const distText = (!cp.invalid && cp.distM!=null) ? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음 · ` : '';
     return `<div class="cp-item">
@@ -531,6 +556,18 @@ function calcRate(mid, iid){
   $(`curH_${iid}`).value = nowH;
 }
 
+document.addEventListener('input', (e)=>{
+  if(e.target.dataset && e.target.dataset.act==='hpreview'){
+    const iid = e.target.dataset.i;
+    const mid = findMachineIdByItem(iid);
+    const it = findItem(mid, iid);
+    const t_um = parseFloat($(`t_${iid}`).value);
+    const H = parseFloat($(`H_${iid}`).value);
+    const hint = $(`hpreview_${iid}`);
+    if(hint) hint.textContent = '예상 잔량: ' + fmtM(rollRemainingM(it.core_mm, t_um, H));
+  }
+});
+
 document.addEventListener('click', (e)=>{
   const btn = e.target.closest('button');
   if(!btn) return;
@@ -559,6 +596,26 @@ document.addEventListener('click', (e)=>{
   else if(act==='delmachine'){
     e.stopPropagation();
     if(confirm('이 기계와 하위 항목을 모두 삭제할까요?')){ state.machines=state.machines.filter(m=>m.id!==mid); saveState(); renderAll(); }
+  }
+  else if(act==='togglepause'){
+    const m = findMachine(mid);
+    if(!m.paused){
+      m.paused = true;
+      m.pausedAt = Date.now();
+    }else{
+      const pauseDuration = Date.now() - (m.pausedAt || Date.now());
+      m.items.forEach(it=>{
+        if(it.type==='roll'){
+          if(it.rollTarget) it.rollTarget += pauseDuration;
+          it.checkpoints.forEach(cp=>{ cp.target += pauseDuration; });
+        }else{
+          if(it.target) it.target += pauseDuration;
+        }
+      });
+      m.paused = false;
+      m.pausedAt = null;
+    }
+    saveState(); renderAll();
   }
   else if(act==='additem'){
     const type = $(`newtype_${mid}`).value;
@@ -596,17 +653,20 @@ document.addEventListener('click', (e)=>{
 
 function tick(){
   renderSummary();
-  state.machines.forEach(m=>m.items.forEach(it=>{
-    if(it.type==='roll'){
-      if(it.rollTarget){ const el=$(`rollres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.rollTarget).text; }
-      it.checkpoints.forEach(cp=>{ const el=$(`cptime_${cp.id}`); if(el){
-        if(cp.invalid) el.textContent='확인 필요';
-        else{ const d = cp.distM!=null? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음 · `:''; el.textContent = d+fmtCountdown(cp.target).text; }
-      }});
-    }else{
-      if(it.target){ const el=$(`contres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.target).text; }
-    }
-  }));
+  state.machines.forEach(m=>{
+    const refNow = nowFor(m);
+    m.items.forEach(it=>{
+      if(it.type==='roll'){
+        if(it.rollTarget){ const el=$(`rollres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.rollTarget, refNow, m.paused).text; }
+        it.checkpoints.forEach(cp=>{ const el=$(`cptime_${cp.id}`); if(el){
+          if(cp.invalid && !m.paused) el.textContent='확인 필요';
+          else{ const d = cp.distM!=null? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음 · `:''; el.textContent = d+fmtCountdown(cp.target, refNow, m.paused).text; }
+        }});
+      }else{
+        if(it.target){ const el=$(`contres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.target, refNow, m.paused).text; }
+      }
+    });
+  });
 }
 
 renderAll();
