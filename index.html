@@ -74,7 +74,13 @@
   details.machine > summary::-webkit-details-marker{ display:none; }
   .m-name-input{ font-weight:800; font-size:1rem; border:0; background:transparent; color:var(--text); padding:2px 0; width:100%; }
   .m-name-input:focus{ outline:none; border-bottom:1px dashed var(--blue); }
-  .m-name-label{ font-weight:800; font-size:1rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .m-name-label{ font-weight:800; font-size:1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .m-name-group{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+  .pause-icon-btn{
+    flex-shrink:0; width:30px; height:30px; border-radius:50%; border:1px solid var(--line);
+    background:#fff; color:var(--blue); font-size:.85rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .pause-icon-btn.is-paused{ background:var(--blue); color:#fff; border-color:var(--blue); }
   .arrow{ color:var(--text-dim); font-size:.8rem; transition:transform .15s; margin-left:8px; flex-shrink:0; }
   details.machine[open] > summary .arrow{ transform:rotate(90deg); }
   details.item[open] > summary .arrow{ transform:rotate(90deg); }
@@ -415,7 +421,11 @@ function machineHTML(m){
   return `
   <details class="machine" ${isOpen?'open':''} id="det-${m.id}">
     <summary>
-      <span class="m-name-label">${m.no}${m.paused?' <span class=\"pause-badge\">⏸ 일시정지</span>':''}</span>
+      <span class="m-name-group">
+        <span class="m-name-label">${m.no}</span>
+        <button class="pause-icon-btn ${m.paused?'is-paused':''}" data-act="togglepause" data-m="${m.id}" title="${m.paused?'가동 재개':'가동 일시정지'}">${m.paused ? '▶' : '⏸'}</button>
+        ${m.paused?'<span class="pause-badge">일시정지</span>':''}
+      </span>
       <span class="arrow">▶</span>
     </summary>
     <div class="machine-body">
@@ -425,9 +435,6 @@ function machineHTML(m){
         <option value="container">점착제통</option>
       </select>
       <button class="btn-add" data-act="additem" data-m="${m.id}">+ 항목 추가</button>
-      <button class="btn ${m.paused?'btn-blue':'btn-ghost'}" style="width:100%;margin-top:8px;" data-act="togglepause" data-m="${m.id}">
-        ${m.paused ? '▶ 가동 재개 (타이머 이어서 진행)' : '⏸ 가동 일시정지 (원단·부품 교체 중)'}
-      </button>
       <div class="card-footer-actions">
         <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">이름 수정</button>
         <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">기계 삭제</button>
@@ -448,12 +455,17 @@ function renderMachines(){
   });
 }
 
+function liveRemainM(it, refNow){
+  if(it.rollTarget==null || !(it.speed>0)) return null;
+  return Math.max(0, (it.rollTarget-refNow)/60000*it.speed);
+}
+
 function renderSummary(){
   const entries = [];
   state.machines.forEach(m=>{
     m.items.forEach(it=>{
       if(it.type==='roll'){
-        if(it.rollTarget) entries.push({name:`${m.no} · ${it.label}`, kind:`롤 교체${it.rollRemainM!=null?' · 약 '+it.rollRemainM.toLocaleString(undefined,{maximumFractionDigits:0})+'m 남음':''}`, target:it.rollTarget, m});
+        if(it.rollTarget) entries.push({name:`${m.no} · ${it.label}`, target:it.rollTarget, m, roll:it});
         it.checkpoints.forEach(cp=>entries.push({name:`${m.no} · ${it.label}`, kind:cp.label, target:cp.target, invalid:cp.invalid, m}));
       }else{
         if(it.target) entries.push({name:`${m.no} · ${it.label}`, kind:'약품 교체', target:it.target, m});
@@ -464,10 +476,16 @@ function renderSummary(){
   const el = $('summary-list');
   if(!entries.length){ el.innerHTML = '<div class="empty-msg">기계와 항목을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
   el.innerHTML = entries.map(en=>{
-    let {text,tier} = fmtCountdown(en.target, nowFor(en.m), en.m.paused);
+    const refNow = nowFor(en.m);
+    let {text,tier} = fmtCountdown(en.target, refNow, en.m.paused);
     if(en.invalid && !en.m.paused){ text='확인 필요'; tier='urgent'; }
+    let kind = en.kind;
+    if(en.roll){
+      const liveM = liveRemainM(en.roll, refNow);
+      kind = `롤 교체${liveM!=null?' · 약 '+liveM.toLocaleString(undefined,{maximumFractionDigits:0})+'m 남음':''}`;
+    }
     return `<div class="sum-row ${tier==='urgent'?'urgent':(tier==='soon'?'soon':(tier==='paused'?'paused':''))}">
-      <div class="sum-left"><div class="name">${en.name}</div><div class="kind">${en.kind}</div></div>
+      <div class="sum-left"><div class="name">${en.name}</div><div class="kind">${kind}</div></div>
       <div class="sum-time ${tier}">${text}</div>
     </div>`;
   }).join('');
@@ -598,6 +616,8 @@ document.addEventListener('click', (e)=>{
     if(confirm('이 기계와 하위 항목을 모두 삭제할까요?')){ state.machines=state.machines.filter(m=>m.id!==mid); saveState(); renderAll(); }
   }
   else if(act==='togglepause'){
+    e.stopPropagation();
+    e.preventDefault();
     const m = findMachine(mid);
     if(!m.paused){
       m.paused = true;
@@ -657,7 +677,10 @@ function tick(){
     const refNow = nowFor(m);
     m.items.forEach(it=>{
       if(it.type==='roll'){
-        if(it.rollTarget){ const el=$(`rollres_time_${it.id}`); if(el) el.textContent=fmtCountdown(it.rollTarget, refNow, m.paused).text; }
+        if(it.rollTarget){
+          const elT=$(`rollres_time_${it.id}`); if(elT) elT.textContent=fmtCountdown(it.rollTarget, refNow, m.paused).text;
+          const elL=$(`rollres_len_${it.id}`); if(elL){ const liveM=liveRemainM(it, refNow); elL.textContent = liveM!=null? `남은 ${liveM.toLocaleString(undefined,{maximumFractionDigits:1})} m` : '남은 – m'; }
+        }
         it.checkpoints.forEach(cp=>{ const el=$(`cptime_${cp.id}`); if(el){
           if(cp.invalid && !m.paused) el.textContent='확인 필요';
           else{ const d = cp.distM!=null? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음 · `:''; el.textContent = d+fmtCountdown(cp.target, refNow, m.paused).text; }
