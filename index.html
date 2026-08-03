@@ -208,7 +208,7 @@ const uid = (p) => p + Date.now() + Math.random().toString(36).slice(2,6);
 
 function defaultRollItem(label){
   return { id: uid('it'), type:'roll', label,
-    core_mm:76.2, t_um:12, L_total:6100, H:30, speed:50,
+    core_mm:103, t_um:12, L_total:6100, H:30, speed:50,
     rollTarget:null, rollRemainM:null, rollRatio:null, checkpoints:[] };
 }
 function defaultContainerItem(label){
@@ -308,8 +308,8 @@ function itemBodyHTML(m, it){
       <div class="sec-label">롤 규격</div>
       <div class="input-group">
         <div class="toggle">
-          <button type="button" data-act="core3" data-m="${m.id}" data-i="${it.id}" class="c3-${it.id} ${it.core_mm===76.2?'active':''}">3인치 (76.2mm)</button>
-          <button type="button" data-act="core6" data-m="${m.id}" data-i="${it.id}" class="c6-${it.id} ${it.core_mm===152.4?'active':''}">6인치 (152.4mm)</button>
+          <button type="button" data-act="core3" data-m="${m.id}" data-i="${it.id}" class="c3-${it.id} ${it.core_mm===103?'active':''}">103mm</button>
+          <button type="button" data-act="core6" data-m="${m.id}" data-i="${it.id}" class="c6-${it.id} ${it.core_mm===182?'active':''}">182mm</button>
         </div>
       </div>
       <div class="row2">
@@ -536,8 +536,8 @@ document.addEventListener('click', (e)=>{
   if(!btn) return;
   const act = btn.dataset.act;
   const mid = btn.dataset.m, iid = btn.dataset.i;
-  if(act==='core3'){ findItem(mid,iid).core_mm=76.2; saveState(); renderAll(); }
-  else if(act==='core6'){ findItem(mid,iid).core_mm=152.4; saveState(); renderAll(); }
+  if(act==='core3'){ findItem(mid,iid).core_mm=103; saveState(); renderAll(); }
+  else if(act==='core6'){ findItem(mid,iid).core_mm=182; saveState(); renderAll(); }
   else if(act==='renamemachine'){
     const m = findMachine(mid);
     const name = prompt('기계 번호를 입력하세요', m.no);
