@@ -158,6 +158,19 @@
   <div id="machines-container"></div>
   <button class="btn-add" id="add-machine">+ 기계 추가</button>
 
+  <!-- 항목 추가 모달 (고정 명칭 선택) -->
+  <div class="modal-overlay" id="addItemModal">
+    <div class="modal">
+      <div class="modal-header">항목 추가</div>
+      <div class="modal-body">
+        <div class="section-label">자주 쓰는 이름</div>
+        <div class="item-grid" id="presetItemGrid" style="grid-template-columns:1fr 1fr;"></div>
+        <button class="btn-add" id="customItemBtn" style="margin-top:4px;">+ 직접 입력</button>
+        <button class="btn btn-ghost" style="width:100%;" onclick="closeModal('addItemModal')">취소</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 제품 추가 모달 -->
   <div class="modal-overlay" id="productModal">
     <div class="modal">
@@ -206,6 +219,14 @@
 const STORAGE_KEY = 'linewatch_v2';
 const $ = (id) => document.getElementById(id);
 const uid = (p) => p + Date.now() + Math.random().toString(36).slice(2,6);
+
+const ITEM_PRESETS = [
+  { label:'뚜껑', type:'roll' },
+  { label:'바닥', type:'roll' },
+  { label:'이형지', type:'roll' },
+  { label:'기재', type:'roll' },
+  { label:'점착제', type:'container' },
+];
 
 function defaultItem(type, label){
   if(type==='roll'){
@@ -516,11 +537,25 @@ document.addEventListener('click', (e)=>{
     openModal('productModal');
   }
   else if(act==='additem'){
-    const type = confirm('점착제통 추가? (취소: 원단롤)') ? 'container' : 'roll';
-    const label = prompt('항목 이름을 입력하세요');
-    if(label===null) return;
-    findProduct(mid, pid).items.push(defaultItem(type, label.trim() || type));
-    saveState(); renderAll();
+    const grid = $('presetItemGrid');
+    grid.innerHTML = ITEM_PRESETS.map((p,idx)=>`
+      <button class="item-btn" data-act="addpresetitem" data-m="${mid}" data-p="${pid}" data-preset="${idx}" style="border:1.5px solid var(--line); cursor:pointer;">
+        <div class="item-btn-name">${p.label}</div>
+        <div class="item-btn-info">${p.type==='roll'?'원단롤':'점착제통'}</div>
+      </button>`).join('');
+    $('customItemBtn').onclick = ()=>{
+      const label = prompt('항목 이름을 입력하세요');
+      if(label===null || !label.trim()) return;
+      const type = confirm('점착제통인가요? (취소: 원단롤)') ? 'container' : 'roll';
+      findProduct(mid, pid).items.push(defaultItem(type, label.trim()));
+      saveState(); renderAll(); closeModal('addItemModal');
+    };
+    openModal('addItemModal');
+  }
+  else if(act==='addpresetitem'){
+    const preset = ITEM_PRESETS[parseInt(btn.dataset.preset)];
+    findProduct(mid, pid).items.push(defaultItem(preset.type, preset.label));
+    saveState(); renderAll(); closeModal('addItemModal');
   }
   else if(act==='openitem'){
     const it = findItem(mid, pid, iid);
