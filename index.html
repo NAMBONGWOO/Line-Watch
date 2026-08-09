@@ -81,7 +81,10 @@
   .modal-overlay{ display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:100; align-items:center; justify-content:center; }
   .modal-overlay.show{ display:flex; }
   .modal{ background:var(--card); border-radius:12px; width:90%; max-width:340px; max-height:85vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
-  .modal-header{ background:linear-gradient(180deg,var(--blue-bright),var(--blue)); color:#fff; padding:14px 16px; font-weight:700; font-size:.9rem; border-radius:12px 12px 0 0; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .modal-header{ background:linear-gradient(180deg,var(--blue-bright),var(--blue)); color:#fff; padding:14px 16px; font-weight:700; font-size:.9rem; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .modal-close-x{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:0; background:rgba(255,255,255,.2); color:#fff; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .modal-body{ padding:16px; }
   .input-group{ margin-bottom:12px; }
   .input-label{ display:block; font-size:.72rem; color:var(--text-dim); margin-bottom:4px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
@@ -141,7 +144,7 @@
   <!-- 신규 제품 모달 -->
   <div class="modal-overlay" id="productModal">
     <div class="modal">
-      <div class="modal-header">신규 제품 추가</div>
+      <div class="modal-header"><span>신규 제품 추가</span><button class="modal-close-x" onclick="closeModal('productModal')">✕</button></div>
       <div class="modal-body" id="productModalBody"></div>
     </div>
   </div>
@@ -149,7 +152,7 @@
   <!-- 항목 추가 모달 -->
   <div class="modal-overlay" id="addItemModal">
     <div class="modal">
-      <div class="modal-header">항목 추가</div>
+      <div class="modal-header"><span>항목 추가</span><button class="modal-close-x" onclick="closeModal('addItemModal')">✕</button></div>
       <div class="modal-body">
         <div class="section-label">자주 쓰는 이름</div>
         <div class="item-grid" id="presetItemGrid" style="grid-template-columns:1fr 1fr;"></div>
@@ -162,7 +165,7 @@
   <!-- 항목 상세 모달 -->
   <div class="modal-overlay" id="itemModal">
     <div class="modal">
-      <div class="modal-header" id="itemModalTitle">항목 상세</div>
+      <div class="modal-header"><span id="itemModalTitle">항목 상세</span><button class="modal-close-x" onclick="closeModal('itemModal')">✕</button></div>
       <div class="modal-body" id="itemModalBody"></div>
     </div>
   </div>
@@ -465,7 +468,17 @@ function productHTML(m, p){
   <button class="btn-add" data-act="additem" data-m="${m.id}" data-p="${p.id}" style="margin-bottom:0;">+ 항목 추가</button>
   <div class="section-label">생산 이력</div>
   <div class="history-list" id="hist_${p.id}"></div>
-  ${p.active ? `<button class="btn btn-blue" style="margin-top:10px; width:100%;" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button>` : ''}
+  ${p.active ? `
+    <div class="lot-box">
+      <div class="section-label">로트 포장 완료</div>
+      <div class="input-group"><label class="input-label">로트번호</label><input type="text" id="lotnum_${p.id}" value="${nextLotNumber(m)}"></div>
+      <div class="input-group"><label class="input-label">이번 로트 권취 길이 (m)</label><input type="number" id="lotamt_${p.id}" placeholder=""></div>
+      <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="lotnote_${p.id}" placeholder="예: 지관 변경, 재생원단 등"></div>
+      <button class="btn btn-blue" data-act="recordlot" data-m="${m.id}" data-p="${p.id}">✓ 로트 완료 기록</button>
+      <div class="btn-hint">이력에 남음 · 실제 포장할 때만 누르기</div>
+    </div>
+    <button class="btn btn-blue" style="margin-top:10px; width:100%;" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button>
+  ` : ''}
   <div style="margin-top:10px;"></div>`;
 }
 
@@ -554,47 +567,48 @@ function renderItemModal(mid, pid, iid){
     const cpListHtml = renderCpListInModal(it, mid);
     modalBody = `
       <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
-      <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}"></div>
-      <div class="input-group"><label class="input-label">초기 총 길이 (m)</label><input type="number" id="L_${iid}" value="${it.L_total??''}"></div>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}"></div>
+        <div class="input-group"><label class="input-label">초기 총 길이 (m)</label><input type="number" id="L_${iid}" value="${it.L_total??''}"></div>
+      </div>
       <div class="input-group">
         <label class="input-label">지관 크기</label>
-        <div style="display:flex; gap:6px;">
-          <button class="btn ${it.core_mm===103?'btn-blue':'btn-ghost'}" data-act="core103" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="flex:1; padding:8px;">103mm</button>
-          <button class="btn ${it.core_mm===182?'btn-blue':'btn-ghost'}" data-act="core182" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="flex:1; padding:8px;">182mm</button>
+        <div class="row2">
+          <button class="btn ${it.core_mm===103?'btn-blue':'btn-ghost'}" data-act="core103" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="padding:8px;">103mm</button>
+          <button class="btn ${it.core_mm===182?'btn-blue':'btn-ghost'}" data-act="core182" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="padding:8px;">182mm</button>
         </div>
       </div>
-      <div class="input-group"><label class="input-label">쌓인 두께 H (mm)</label><input type="number" id="H_${iid}" value="${it.H??''}"></div>
-      <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="speed_${iid}" value="${it.speed??''}"></div>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">쌓인 두께 H (mm)</label><input type="number" id="H_${iid}" value="${it.H??''}"></div>
+        <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="speed_${iid}" value="${it.speed??''}"></div>
+      </div>
       <button class="btn btn-ghost" data-act="calcroll" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">측정값 업데이트</button>
       <div class="btn-hint">이력 안 남음 · 현재 잔량만 재계산</div>
       ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
       <div class="section-label">체크포인트</div>
       <div class="history-list">${cpListHtml}</div>
-      <input type="text" id="cplabel_${iid}" placeholder="이음매 이름" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px; margin-top:10px;">
-      <input type="number" id="cpH_${iid}" placeholder="높이(mm)" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px;">
-      <button class="btn btn-ghost" data-act="addcp" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">+ 체크포인트 추가</button>
-
-      <div class="lot-box">
-        <div class="section-label">로트 포장 완료</div>
-        <div class="input-group"><label class="input-label">로트번호</label><input type="text" id="lotnum_${iid}" value="${nextLotNumber(m)}"></div>
-        <div class="input-group"><label class="input-label">이번 로트 권취 길이 (m)</label><input type="number" id="lotamt_${iid}" placeholder=""></div>
-        <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="lotnote_${iid}" placeholder="예: 지관 변경, 재생원단 등"></div>
-        <button class="btn btn-blue" data-act="recordlot" data-m="${mid}" data-p="${pid}" data-i="${iid}">✓ 로트 완료 기록</button>
-        <div class="btn-hint">이력에 남음 · 실제 포장할 때만 누르기</div>
+      <div class="row2">
+        <input type="text" id="cplabel_${iid}" placeholder="이음매 이름" style="padding:8px; border:1px solid var(--line); border-radius:6px;">
+        <input type="number" id="cpH_${iid}" placeholder="높이(mm)" style="padding:8px; border:1px solid var(--line); border-radius:6px;">
       </div>
+      <button class="btn btn-ghost" data-act="addcp" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%; margin-top:8px;">+ 체크포인트 추가</button>
     `;
   }else if(it.type==='container'){
     modalBody = `
       <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
-      <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
-      <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
+        <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
+      </div>
       <div class="input-group"><label class="input-label">교체 기준 높이 (mm)</label><input type="number" id="minH_${iid}" value="${it.minH??''}"></div>
       <button class="btn btn-blue" data-act="calccontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">계산 업데이트</button>
       ${it.target ? `<div class="result-box">예상 교체까지<br>약 ${Math.floor((it.target-refNow)/3600000)}시간</div>` : ''}
       <div class="section-label">소모속도 모를 때 (자동 계산)</div>
-      <div class="input-group"><label class="input-label">이전 높이(mm)</label><input type="number" id="prevH_${iid}"></div>
-      <div class="input-group"><label class="input-label">지난 시간(시간)</label><input type="number" id="elapsedH_${iid}"></div>
-      <div class="input-group"><label class="input-label">지금 높이(mm)</label><input type="number" id="nowH_${iid}"></div>
+      <div class="row3">
+        <div class="input-group"><label class="input-label">이전 높이</label><input type="number" id="prevH_${iid}"></div>
+        <div class="input-group"><label class="input-label">지난 시간</label><input type="number" id="elapsedH_${iid}"></div>
+        <div class="input-group"><label class="input-label">지금 높이</label><input type="number" id="nowH_${iid}"></div>
+      </div>
       <button class="btn btn-ghost" data-act="calcrate" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">속도 계산해서 적용</button>
     `;
   }else{
@@ -605,10 +619,7 @@ function renderItemModal(mid, pid, iid){
     `;
   }
   $('itemModalTitle').textContent = findProduct(mid, pid).name + ' · ' + it.label;
-  $('itemModalBody').innerHTML = modalBody + `
-    <div class="modal-buttons" style="margin-top:16px;">
-      <button class="btn btn-ghost" onclick="closeModal('itemModal')" style="width:100%;">닫기</button>
-    </div>`;
+  $('itemModalBody').innerHTML = modalBody;
 }
 
 // ---- 신규 제품 모달 ----
@@ -714,14 +725,14 @@ document.addEventListener('click', (e)=>{
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='recordlot'){
-    const it = findItem(mid, pid, iid);
-    const lotNumber = $(`lotnum_${iid}`).value.trim();
-    const amount = parseFloat($(`lotamt_${iid}`).value);
-    const note = $(`lotnote_${iid}`).value.trim();
+    const p = findProduct(mid, pid);
+    const lotNumber = $(`lotnum_${pid}`).value.trim();
+    const amount = parseFloat($(`lotamt_${pid}`).value);
+    const note = $(`lotnote_${pid}`).value.trim();
     if(!lotNumber){ alert('로트번호를 확인해주세요.'); return; }
     if(!(amount>0)){ alert('권취 길이를 입력해주세요.'); return; }
-    findProduct(mid, pid).histories.push({ id:uid('h'), type:'lot', label:it.label, lotNumber, amount:amount+'m', note, time:Date.now() });
-    saveState(); renderAll(); renderItemModal(mid, pid, iid);
+    p.histories.push({ id:uid('h'), type:'lot', label:p.name, lotNumber, amount:amount+'m', note, time:Date.now() });
+    saveState(); renderAll();
   }
   else if(act==='calccontainer'){
     const it = findItem(mid, pid, iid);
