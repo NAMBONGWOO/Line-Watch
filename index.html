@@ -284,10 +284,13 @@ $('uploadPresetBtn').addEventListener('click', ()=> $('presetFileInput').click()
 $('presetFileInput').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
+  const isCsv = file.name.toLowerCase().endsWith('.csv');
   const reader = new FileReader();
   reader.onload = (evt)=>{
     try{
-      const wb = XLSX.read(evt.target.result, { type:'array' });
+      const wb = isCsv
+        ? XLSX.read(evt.target.result, { type:'string' })
+        : XLSX.read(evt.target.result, { type:'array' });
       const sheetName = wb.SheetNames.includes('프리셋') ? '프리셋' : wb.SheetNames[0];
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval:'' });
       const grouped = {};
@@ -304,6 +307,11 @@ $('presetFileInput').addEventListener('change', (e)=>{
           L_total: parseFloat(row['초기총길이(m)']) || null,
         });
       });
+      if(Object.keys(grouped).length === 0){
+        alert('인식된 행이 없습니다. 파일의 컬럼명이 양식과 일치하는지 확인해주세요.');
+        e.target.value = '';
+        return;
+      }
       let addedCount = 0, updatedCount = 0;
       Object.keys(grouped).forEach(name=>{
         const existing = state.presets.find(p=>p.name===name);
@@ -317,7 +325,8 @@ $('presetFileInput').addEventListener('change', (e)=>{
       alert('업로드 실패: 파일 형식을 확인해주세요.\n'+err.message);
     }
   };
-  reader.readAsArrayBuffer(file);
+  if(isCsv) reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
 });
 
 // ---- 헬퍼 ----
