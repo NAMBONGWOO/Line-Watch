@@ -230,9 +230,9 @@ const ITEM_PRESETS = [
 
 function defaultItem(type, label){
   if(type==='roll'){
-    return { id:uid('it'), type, label, core_mm:103, t_um:12, L_total:6100, H:30, speed:50, rollTarget:null, rollRemainM:null, checkpoints:[] };
+    return { id:uid('it'), type, label, core_mm:103, t_um:null, L_total:null, H:null, speed:null, rollTarget:null, rollRemainM:null, checkpoints:[] };
   }else{
-    return { id:uid('it'), type, label, curH:null, rate:null, minH:50, target:null };
+    return { id:uid('it'), type, label, curH:null, rate:null, minH:null, target:null };
   }
 }
 function defaultProduct(name){
@@ -504,6 +504,49 @@ function renderSummary(){
 function renderAll(){ renderMachines(); renderHistories(); renderSummary(); }
 
 // ---- 액션 ----
+function renderItemModal(mid, pid, iid){
+  const it = findItem(mid, pid, iid);
+  const m = findMachine(mid);
+  const refNow = nowFor(m);
+  let modalBody = '';
+  if(it.type==='roll'){
+    const cpListHtml = it.checkpoints.length > 0 ? renderCpListInModal(it, mid) : '<div class="empty-msg" style="font-size:.75rem;">체크포인트 없음</div>';
+    modalBody = `
+      <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}"></div>
+      <div class="input-group"><label class="input-label">초기 총 길이 (m)</label><input type="number" id="L_${iid}" value="${it.L_total??''}"></div>
+      <div class="input-group">
+        <label class="input-label">지관 크기</label>
+        <div style="display:flex; gap:6px;">
+          <button class="btn ${it.core_mm===103?'btn-blue':'btn-ghost'}" data-act="core103" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="flex:1; padding:8px;">103mm</button>
+          <button class="btn ${it.core_mm===182?'btn-blue':'btn-ghost'}" data-act="core182" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="flex:1; padding:8px;">182mm</button>
+        </div>
+      </div>
+      <div class="input-group"><label class="input-label">쌓인 두께 H (mm)</label><input type="number" id="H_${iid}" value="${it.H??''}"></div>
+      <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="speed_${iid}" value="${it.speed??''}"></div>
+      <button class="btn btn-blue" data-act="calcroll" data-m="${mid}" data-p="${pid}" data-i="${iid}">롤 계산 업데이트</button>
+      ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
+      <div class="section-label">체크포인트</div>
+      <div class="history-list">${cpListHtml}</div>
+      <input type="text" id="cplabel_${iid}" placeholder="이음매 이름" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px; margin-top:10px;">
+      <input type="number" id="cpH_${iid}" placeholder="높이(mm)" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px;">
+      <button class="btn btn-ghost" data-act="addcp" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">+ 체크포인트 추가</button>
+    `;
+  }else{
+    modalBody = `
+      <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
+      <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
+      <div class="input-group"><label class="input-label">교체 기준 높이 (mm)</label><input type="number" id="minH_${iid}" value="${it.minH??''}"></div>
+      <button class="btn btn-blue" data-act="calccontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">계산 업데이트</button>
+      ${it.target ? `<div class="result-box">예상 교체까지<br>약 ${Math.floor((it.target-refNow)/3600000)}시간</div>` : ''}
+    `;
+  }
+  $('itemModalTitle').textContent = findProduct(mid, pid).name + ' · ' + it.label;
+  $('itemModalBody').innerHTML = modalBody + `
+    <div class="modal-buttons" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('itemModal')" style="width:100%;">닫기</button>
+    </div>`;
+}
+
 document.addEventListener('click', (e)=>{
   const btn = e.target.closest('button');
   if(!btn) return;
@@ -558,46 +601,7 @@ document.addEventListener('click', (e)=>{
     saveState(); renderAll(); closeModal('addItemModal');
   }
   else if(act==='openitem'){
-    const it = findItem(mid, pid, iid);
-    const m = findMachine(mid);
-    const refNow = nowFor(m);
-    let modalBody = '';
-    if(it.type==='roll'){
-      const cpListHtml = it.checkpoints.length > 0 ? renderCpListInModal(it, mid) : '<div class="empty-msg" style="font-size:.75rem;">체크포인트 없음</div>';
-      modalBody = `
-        <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}"></div>
-        <div class="input-group"><label class="input-label">초기 총 길이 (m)</label><input type="number" id="L_${iid}" value="${it.L_total??''}"></div>
-        <div class="input-group">
-          <label class="input-label">지관 크기</label>
-          <div style="display:flex; gap:6px;">
-            <button class="btn ${it.core_mm===103?'btn-blue':'btn-ghost'}" data-act="core103" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="flex:1; padding:8px;">103mm</button>
-            <button class="btn ${it.core_mm===182?'btn-blue':'btn-ghost'}" data-act="core182" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="flex:1; padding:8px;">182mm</button>
-          </div>
-        </div>
-        <div class="input-group"><label class="input-label">쌓인 두께 H (mm)</label><input type="number" id="H_${iid}" value="${it.H??''}"></div>
-        <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="speed_${iid}" value="${it.speed??''}"></div>
-        <button class="btn btn-blue" data-act="calcroll" data-m="${mid}" data-p="${pid}" data-i="${iid}">롤 계산 업데이트</button>
-        ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
-        <div class="section-label">체크포인트</div>
-        <div class="history-list">${cpListHtml}</div>
-        <input type="text" id="cplabel_${iid}" placeholder="이음매 이름" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px; margin-top:10px;">
-        <input type="number" id="cpH_${iid}" placeholder="높이(mm)" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px;">
-        <button class="btn btn-ghost" data-act="addcp" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">+ 체크포인트 추가</button>
-      `;
-    }else{
-      modalBody = `
-        <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
-        <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
-        <div class="input-group"><label class="input-label">교체 기준 높이 (mm)</label><input type="number" id="minH_${iid}" value="${it.minH??50}"></div>
-        <button class="btn btn-blue" data-act="calccontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">계산 업데이트</button>
-        ${it.target ? `<div class="result-box">예상 교체까지<br>약 ${Math.floor((it.target-refNow)/3600000)}시간</div>` : ''}
-      `;
-    }
-    $('itemModalTitle').textContent = findProduct(mid, pid).name + ' · ' + it.label;
-    $('itemModalBody').innerHTML = modalBody + `
-      <div class="modal-buttons" style="margin-top:16px;">
-        <button class="btn btn-ghost" onclick="closeModal('itemModal')" style="width:100%;">닫기</button>
-      </div>`;
+    renderItemModal(mid, pid, iid);
     openModal('itemModal');
   }
   else if(act==='calcroll'){
@@ -619,7 +623,7 @@ document.addEventListener('click', (e)=>{
       id: uid('h'), type:'roll', label:it.label, amount:remainM.toLocaleString(undefined,{maximumFractionDigits:0})+'m', time:Date.now()
     });
     
-    saveState(); renderAll();
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='calccontainer'){
     const it = findItem(mid, pid, iid);
@@ -636,7 +640,7 @@ document.addEventListener('click', (e)=>{
       id: uid('h'), type:'container', label:it.label, amount:curH+'mm', time:Date.now()
     });
     
-    saveState(); renderAll();
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='endproduct'){
     if(confirm('이 제품의 생산을 완료하시겠습니까?')){
@@ -678,7 +682,7 @@ document.addEventListener('click', (e)=>{
   else if(act==='core103' || act==='core182'){
     const it = findItem(mid, pid, iid);
     it.core_mm = act==='core103' ? 103 : 182;
-    saveState(); renderAll();
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='addcp'){
     const it = findItem(mid, pid, iid);
@@ -688,7 +692,7 @@ document.addEventListener('click', (e)=>{
     if(!(H_cp>=0) || H_cp >= it.H){ alert('높이값을 확인해주세요.'); return; }
     const dist = distanceToCheckpoint(it, H_cp);
     it.checkpoints.push({ id:uid('cp'), label, H_cp, distM:dist, target:Date.now()+(dist/it.speed)*60000, invalid:false });
-    saveState(); renderAll();
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
 });
 
