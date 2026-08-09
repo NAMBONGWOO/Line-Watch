@@ -343,6 +343,13 @@ function rollRemainingM(core_mm, t_um, H){
   const t_mm = t_um/1000, r0 = core_mm/2, R = r0+H;
   return Math.PI*(Math.pow(R,2)-Math.pow(r0,2)) / t_mm / 1000;
 }
+function H_fromLength(core_mm, t_um, L){
+  if(!(t_um>0) || !(L>=0) || !(core_mm>0)) return null;
+  const t_mm = t_um/1000, r0 = core_mm/2;
+  const area = L*1000*t_mm;
+  const R = Math.sqrt(r0*r0 + area/Math.PI);
+  return R - r0;
+}
 function fmtM(v){ return v==null ? '–' : v.toLocaleString(undefined,{maximumFractionDigits:1})+' m'; }
 function liveRemainM(it, refNow){
   if(it.rollTarget==null || !(it.speed>0)) return null;
@@ -496,18 +503,22 @@ function renderHistories(){
       const el = $(`hist_${p.id}`);
       if(!el) return;
       if(!p.histories.length){ el.innerHTML = '<div class="empty-msg" style="font-size:.72rem; padding:4px 0;">이력 없음</div>'; return; }
-      el.innerHTML = p.histories.slice().reverse().map(h=>`
+      el.innerHTML = p.histories.slice().reverse().map(h=>{
+        const typeLabel = h.type==='lot' ? '로트 완료' : h.type==='replace' ? '자재 교체' : '생산 종료';
+        const posLine = h.type==='replace' ? `${h.label}${h.materialName?' · '+h.materialName:''}<br>` : '';
+        return `
         <div class="history-item">
           <div class="history-text">
-            <strong>${h.type==='lot'?'로트 완료':'생산 종료'}</strong>${h.lotNumber?' · '+h.lotNumber:''}<br>
-            ${h.amount ? h.amount+' · ':''}${new Date(h.time).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+            <strong>${typeLabel}</strong>${h.lotNumber?' · '+h.lotNumber:''}<br>
+            ${posLine}${h.amount ? h.amount+' · ':''}${new Date(h.time).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
             ${h.note?'<br><span style="color:var(--text-dim);">'+h.note+'</span>':''}
           </div>
           <div class="history-actions">
             <button class="history-btn" data-act="edithist" data-m="${m.id}" data-p="${p.id}" data-h="${h.id}">수정</button>
             <button class="history-btn" data-act="delhist" data-m="${m.id}" data-p="${p.id}" data-h="${h.id}">삭제</button>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     });
   });
 }
@@ -567,6 +578,15 @@ function renderItemModal(mid, pid, iid){
     const cpListHtml = renderCpListInModal(it, mid);
     modalBody = `
       <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+
+      <div class="lot-box" style="background:#fef3e2;">
+        <div class="section-label" style="color:#b3820f;">🔄 자재 교체</div>
+        <div class="input-group"><label class="input-label">새 원단 길이 (m)</label><input type="number" id="replaceLen_${iid}" placeholder="예: 6100"></div>
+        <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="replaceNote_${iid}" placeholder="예: 재생원단, 지관 변경 등"></div>
+        <button class="btn" style="width:100%; background:#e0a417; color:#fff;" data-act="replaceroll" data-m="${mid}" data-p="${pid}" data-i="${iid}">🔄 자재 교체 기록</button>
+        <div class="btn-hint">새 원단으로 갈아 끼웠을 때만 누르기 · 이력에 남음</div>
+      </div>
+
       <div class="row2">
         <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}"></div>
         <div class="input-group"><label class="input-label">초기 총 길이 (m)</label><input type="number" id="L_${iid}" value="${it.L_total??''}"></div>
@@ -596,6 +616,15 @@ function renderItemModal(mid, pid, iid){
   }else if(it.type==='container'){
     modalBody = `
       <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+
+      <div class="lot-box" style="background:#fef3e2;">
+        <div class="section-label" style="color:#b3820f;">🔄 자재 교체 (새 통)</div>
+        <div class="input-group"><label class="input-label">새 통 높이 (mm, 가득참 기준)</label><input type="number" id="replaceContH_${iid}" placeholder=""></div>
+        <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="replaceContNote_${iid}" placeholder=""></div>
+        <button class="btn" style="width:100%; background:#e0a417; color:#fff;" data-act="replacecontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">🔄 자재 교체 기록</button>
+        <div class="btn-hint">새 통으로 갈아 끼웠을 때만 누르기 · 이력에 남음</div>
+      </div>
+
       <div class="row2">
         <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
         <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
@@ -709,6 +738,31 @@ document.addEventListener('click', (e)=>{
     saveState(); renderAll(); closeModal('addItemModal');
   }
   else if(act==='openitem'){ renderItemModal(mid, pid, iid); openModal('itemModal'); }
+  else if(act==='replaceroll'){
+    const it = findItem(mid, pid, iid);
+    it.materialName = $(`mat_${iid}`).value.trim();
+    const len = parseFloat($(`replaceLen_${iid}`).value);
+    const note = $(`replaceNote_${iid}`).value.trim();
+    if(!(len>0)){ alert('새 원단 길이(m)를 입력해주세요.'); return; }
+    if(!(it.t_um>0) || !(it.core_mm>0)){ alert('원단 두께와 지관 크기를 먼저 확인해주세요.'); return; }
+    it.L_total = len;
+    it.H = H_fromLength(it.core_mm, it.t_um, len);
+    it.rollRemainM = len;
+    it.rollTarget = (it.speed>0) ? Date.now() + (len/it.speed)*60000 : null;
+    it.checkpoints = [];
+    findProduct(mid, pid).histories.push({ id:uid('h'), type:'replace', label:it.label, materialName:it.materialName, amount:len+'m', note, time:Date.now() });
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
+  }
+  else if(act==='replacecontainer'){
+    const it = findItem(mid, pid, iid);
+    it.materialName = $(`mat_${iid}`).value.trim();
+    const h = parseFloat($(`replaceContH_${iid}`).value);
+    const note = $(`replaceContNote_${iid}`).value.trim();
+    if(h>0){ it.curH = h; }
+    it.target = null;
+    findProduct(mid, pid).histories.push({ id:uid('h'), type:'replace', label:it.label, materialName:it.materialName, amount:h>0?h+'mm':'', note, time:Date.now() });
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
+  }
   else if(act==='calcroll'){
     const it = findItem(mid, pid, iid);
     it.materialName = $(`mat_${iid}`).value.trim();
