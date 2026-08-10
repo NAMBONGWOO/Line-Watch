@@ -32,13 +32,15 @@
   .auth-status{ font-size:.8rem; color:var(--text-dim); font-weight:700; }
   .auth-status.on{ color:var(--ok); }
 
-  .sum-row{ display:flex; align-items:center; justify-content:space-between; padding:11px 12px; border-radius:9px; margin-bottom:7px; background:var(--card2); border:1px solid var(--line); }
+  .sum-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:11px 12px; border-radius:9px; margin-bottom:7px; background:var(--card2); border:1px solid var(--line); }
   .sum-row.urgent{ border-color:rgba(214,72,63,.5); background:rgba(214,72,63,.07); }
   .sum-row.soon{ border-color:rgba(224,164,23,.5); background:rgba(224,164,23,.08); }
   .sum-row.paused{ opacity:.65; border-style:dashed; }
-  .sum-left .name{ font-size:.9rem; font-weight:800; }
+  .sum-left{ flex:1; min-width:0; }
+  .sum-left .name{ font-size:.9rem; font-weight:800; overflow-wrap:break-word; }
   .sum-left .kind{ font-size:.74rem; color:var(--text-dim); margin-top:1px; }
-  .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:1.05rem; text-align:right; white-space:nowrap; }
+  .sum-sub{ font-size:.7rem; color:var(--text-dim); margin-top:3px; padding-left:8px; border-left:2px solid var(--line); }
+  .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:1.05rem; text-align:right; white-space:nowrap; flex-shrink:0; }
   .sum-time.urgent{ color:var(--warn); } .sum-time.soon{ color:#b3820f; } .sum-time.ok{ color:var(--ok); }
   .sum-time.paused{ color:var(--text-dim); font-size:.85rem; }
   .empty-msg{ color:var(--text-dim); font-size:.85rem; text-align:center; padding:10px 0; }
@@ -374,7 +376,7 @@ function fmtCountdown(targetMs, refNow, paused){
   const totalSec = Math.floor(abs/1000);
   const h = Math.floor(totalSec/3600), m = Math.floor((totalSec%3600)/60);
   const sstr = h>0 ? `${h}시간 ${m}분` : `${m}분`;
-  if(paused) return { text:'⏸ '+(past?'0분':sstr)+' 남음 (일시정지)', tier:'paused' };
+  if(paused) return { text:'⏸ '+(past?'0분':sstr)+' 남음', tier:'paused' };
   let tier = past ? 'urgent' : (diff < 10*60000 ? 'urgent' : (diff < 30*60000 ? 'soon' : 'ok'));
   return { text: past ? '지금 확인!' : sstr+' 후', tier };
 }
@@ -532,45 +534,77 @@ function renderHistories(){
   });
 }
 
-function renderCpListInModal(it, mid){
+function renderCpListInModal(it, mid, pid){
   const m = findMachine(mid);
   const refNow = nowFor(m);
   if(!it.checkpoints.length) return '<div class="empty-msg" style="font-size:.75rem;">체크포인트 없음</div>';
-  return it.checkpoints.map(cp=>{
+  const sorted = it.checkpoints.slice().map(cp=>{
+    const liveDist = cp.invalid ? null : Math.max(0, (cp.target-refNow)/60000*it.speed);
+    return { cp, liveDist };
+  }).sort((a,b)=>{
+    if(a.liveDist==null) return 1;
+    if(b.liveDist==null) return -1;
+    return a.liveDist - b.liveDist;
+  });
+  return sorted.map(({cp, liveDist})=>{
     const {text} = fmtCountdown(cp.target, refNow, m.paused);
-    const distText = cp.invalid ? '확인 필요' : (cp.distM!=null ? `약 ${cp.distM.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음` : '–');
+    const distText = cp.invalid ? '확인 필요' : (liveDist!=null ? `약 ${liveDist.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음` : '–');
     return `<div class="history-item">
-      <div class="history-text"><strong>${cp.label}</strong><br>H ${cp.H_cp}mm · ${distText}</div>
-      <div style="font-size:.75rem; color:var(--text-dim);">${text}</div>
+      <div class="history-text"><strong>${cp.label}</strong><br>H ${cp.H_cp}mm · ${distText} · ${text}</div>
+      <div class="history-actions">
+        <button class="history-btn" data-act="editcp" data-m="${mid}" data-p="${pid}" data-i="${it.id}" data-cp="${cp.id}">수정</button>
+        <button class="history-btn" data-act="delcp" data-m="${mid}" data-p="${pid}" data-i="${it.id}" data-cp="${cp.id}">삭제</button>
+      </div>
     </div>`;
   }).join('');
 }
 
 function renderSummary(){
-  const entries = [];
+  const groups = [];
   state.machines.forEach(m=>{
     m.products.filter(p=>p.active).forEach(p=>{
       const refNow = nowFor(m);
       p.items.forEach(it=>{
+        const name = `${m.no} · ${p.name} · ${it.label}`;
         if(it.type==='roll'){
-          if(it.rollTarget) entries.push({name:`${m.no} · ${p.name} · ${it.label}`, kind:`롤 교체${it.rollRemainM!=null?' · 약 '+it.rollRemainM.toLocaleString(undefined,{maximumFractionDigits:0})+'m 남음':''}`, target:it.rollTarget, m});
-          it.checkpoints.forEach(cp=>entries.push({name:`${m.no} · ${p.name} · ${it.label}`, kind:cp.label, target:cp.target, invalid:cp.invalid, m}));
+          if(!it.rollTarget) return;
+          const liveM = liveRemainM(it, refNow);
+          const subs = [{ target:it.rollTarget, kind:'롤 교체', dist:liveM, invalid:false }];
+          it.checkpoints.forEach(cp=>{
+            const liveD = cp.invalid ? null : Math.max(0, (cp.target-refNow)/60000*it.speed);
+            subs.push({ target:cp.target, kind:cp.label, dist:liveD, invalid:cp.invalid });
+          });
+          subs.sort((a,b)=>a.target-b.target);
+          groups.push({ name, m, primary:subs[0], secondary:subs.slice(1) });
         }else if(it.type==='container'){
-          if(it.target) entries.push({name:`${m.no} · ${p.name} · ${it.label}`, kind:'약품 교체', target:it.target, m});
+          if(!it.target) return;
+          groups.push({ name, m, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false }, secondary:[] });
         }
       });
     });
   });
-  entries.sort((a,b)=>a.target-b.target);
+  groups.sort((a,b)=>a.primary.target-b.primary.target);
   const el = $('summary-list');
-  if(!entries.length){ el.innerHTML = '<div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
-  el.innerHTML = entries.map(en=>{
-    let {text,tier} = fmtCountdown(en.target, nowFor(en.m), en.m.paused);
-    if(en.invalid && !en.m.paused){ text='확인 필요'; tier='urgent'; }
-    const tierClass = tier==='urgent'?'urgent':(tier==='soon'?'soon':(tier==='paused'?'paused':''));
+  if(!groups.length){ el.innerHTML = '<div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
+
+  function distStr(dist){ return dist!=null ? ` · 약 ${dist.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음` : ''; }
+  function timeOf(sub, refNow, paused){
+    let {text,tier} = fmtCountdown(sub.target, refNow, paused);
+    if(sub.invalid && !paused){ text='확인 필요'; tier='urgent'; }
+    return {text, tier};
+  }
+
+  el.innerHTML = groups.map(g=>{
+    const refNow = nowFor(g.m);
+    const p = timeOf(g.primary, refNow, g.m.paused);
+    const tierClass = p.tier==='urgent'?'urgent':(p.tier==='soon'?'soon':(p.tier==='paused'?'paused':''));
+    const secondaryHTML = g.secondary.map(s=>{
+      const st = timeOf(s, refNow, g.m.paused);
+      return `<div class="sum-sub">↳ ${s.kind}${distStr(s.dist)} · ${st.text}</div>`;
+    }).join('');
     return `<div class="sum-row ${tierClass}">
-      <div class="sum-left"><div class="name">${en.name}</div><div class="kind">${en.kind}</div></div>
-      <div class="sum-time ${tier}">${text}</div>
+      <div class="sum-left"><div class="name">${g.name}</div><div class="kind">${g.primary.kind}${distStr(g.primary.dist)}</div>${secondaryHTML}</div>
+      <div class="sum-time ${p.tier}">${p.text}</div>
     </div>`;
   }).join('');
 }
@@ -584,7 +618,7 @@ function renderItemModal(mid, pid, iid){
   const refNow = nowFor(m);
   let modalBody = '';
   if(it.type==='roll'){
-    const cpListHtml = renderCpListInModal(it, mid);
+    const cpListHtml = renderCpListInModal(it, mid, pid);
     modalBody = `
       <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
       <div class="row2">
@@ -890,6 +924,29 @@ document.addEventListener('click', (e)=>{
     if(!(H_cp>=0) || H_cp >= it.H){ alert('높이값을 확인해주세요.'); return; }
     const dist = distanceToCheckpoint(it, H_cp);
     it.checkpoints.push({ id:uid('cp'), label, H_cp, distM:dist, target:Date.now()+(dist/it.speed)*60000, invalid:false });
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
+  }
+  else if(act==='editcp'){
+    const cpid = btn.dataset.cp;
+    const it = findItem(mid, pid, iid);
+    const cp = it.checkpoints.find(c=>c.id===cpid);
+    if(!cp) return;
+    const newLabel = prompt('이음매 이름', cp.label);
+    if(newLabel===null) return;
+    const newH = prompt('지관부터 쌓인 높이(mm)', cp.H_cp);
+    if(newH===null) return;
+    const H_cp = parseFloat(newH);
+    if(!(H_cp>=0) || H_cp >= it.H){ alert('높이값을 확인해주세요.'); return; }
+    cp.label = newLabel.trim() || cp.label;
+    cp.H_cp = H_cp;
+    const dist = distanceToCheckpoint(it, H_cp);
+    cp.distM = dist; cp.target = Date.now()+(dist/it.speed)*60000; cp.invalid = false;
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
+  }
+  else if(act==='delcp'){
+    const cpid = btn.dataset.cp;
+    const it = findItem(mid, pid, iid);
+    it.checkpoints = it.checkpoints.filter(c=>c.id!==cpid);
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
 });
