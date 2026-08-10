@@ -87,12 +87,15 @@
   .modal-close-x{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:0; background:rgba(255,255,255,.2); color:#fff; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .modal-body{ padding:16px; }
   .input-group{ margin-bottom:12px; }
-  .input-label{ display:block; font-size:.72rem; color:var(--text-dim); margin-bottom:4px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+  .input-label{ display:block; font-size:.72rem; color:var(--text-dim); margin-bottom:4px; font-weight:800; letter-spacing:.03em; }
   input[type=number], input[type=text], select{ width:100%; padding:10px; background:#fff; border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:.92rem; }
   input:focus, select:focus{ outline:none; border-color:var(--blue); }
   .result-box{ background:#e5edf9; padding:10px; border-radius:8px; margin:10px 0; font-size:.75rem; color:var(--blue); font-weight:700; line-height:1.5; }
   .lot-box{ background:#e5edf9; border-radius:10px; padding:12px; margin-top:14px; }
   .lot-box .section-label{ color:var(--blue); margin-top:0; }
+  .action-row-compact{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .btn-compact{ padding:9px 16px; border-radius:8px; font-weight:800; font-size:.8rem; cursor:pointer; border:1.5px dashed var(--blue); background:transparent; color:var(--blue); white-space:nowrap; }
+  .btn-compact.solid{ border-style:solid; border-color:var(--blue); background:linear-gradient(180deg,var(--blue-bright),var(--blue)); color:#fff; }
   .modal-buttons{ display:flex; gap:8px; margin-top:12px; }
   .modal-buttons .btn{ flex:1; padding:10px; }
   .history-list{ margin-top:10px; max-height:200px; overflow-y:auto; }
@@ -159,6 +162,14 @@
         <button class="btn-add" id="customItemBtn" style="margin-top:4px;">+ 직접 입력</button>
         <button class="btn btn-ghost" style="width:100%;" onclick="closeModal('addItemModal')">취소</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 로트 완료 모달 -->
+  <div class="modal-overlay" id="lotModal">
+    <div class="modal">
+      <div class="modal-header"><span>로트 포장 완료</span><button class="modal-close-x" onclick="closeModal('lotModal')">✕</button></div>
+      <div class="modal-body" id="lotModalBody"></div>
     </div>
   </div>
 
@@ -386,9 +397,14 @@ function todayYYMMDD(){
   const d = new Date();
   return String(d.getFullYear()).slice(2) + pad2(d.getMonth()+1) + pad2(d.getDate());
 }
+function autoLotCode(m){
+  if(m.lotCode) return m.lotCode;
+  const match = String(m.no||'').match(/\d+/);
+  return match ? 'C'+match[0] : '';
+}
 function nextLotNumber(m){
   const ymd = todayYYMMDD();
-  const prefix = (m.lotCode||'') + ymd + '-';
+  const prefix = autoLotCode(m) + ymd + '-';
   let count = 0;
   const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
   m.products.forEach(p=>p.histories.forEach(h=>{
@@ -417,9 +433,9 @@ function machineHTML(m){
     </summary>
     <div class="machine-body">
       <div id="products_${m.id}">${m.products.map(p=>productHTML(m,p)).join('')}</div>
-      <button class="btn-add" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button>
+      <div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
       <div class="card-footer-actions">
-        <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트코드${m.lotCode?': '+m.lotCode:''}</button>
+        <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트코드: ${autoLotCode(m)||'미설정'}${m.lotCode?'':' (자동)'}</button>
         <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">이름 수정</button>
         <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">기계 삭제</button>
       </div>
@@ -472,20 +488,13 @@ function productHTML(m, p){
   ${items.length>0 ? `<div class="section-label">원단롤</div><div class="item-grid">${items.map(itemButton).join('')}</div>` : ''}
   ${containers.length>0 ? `<div class="section-label">점착제통</div><div class="item-grid">${containers.map(itemButton).join('')}</div>` : ''}
   ${others.length>0 ? `<div class="section-label">기타</div><div class="item-grid">${others.map(itemButton).join('')}</div>` : ''}
-  <button class="btn-add" data-act="additem" data-m="${m.id}" data-p="${p.id}" style="margin-bottom:0;">+ 항목 추가</button>
+  <div class="action-row-compact">
+    <button class="btn-compact" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 항목 추가</button>
+    ${p.active ? `<button class="btn-compact" data-act="openlotmodal" data-m="${m.id}" data-p="${p.id}">📦 로트 완료</button>` : ''}
+  </div>
   <div class="section-label">생산 이력</div>
   <div class="history-list" id="hist_${p.id}"></div>
-  ${p.active ? `
-    <div class="lot-box">
-      <div class="section-label">로트 포장 완료</div>
-      <div class="input-group"><label class="input-label">로트번호</label><input type="text" id="lotnum_${p.id}" value="${nextLotNumber(m)}"></div>
-      <div class="input-group"><label class="input-label">이번 로트 권취 길이 (m)</label><input type="number" id="lotamt_${p.id}" placeholder=""></div>
-      <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="lotnote_${p.id}" placeholder="예: 지관 변경, 재생원단 등"></div>
-      <button class="btn btn-blue" data-act="recordlot" data-m="${m.id}" data-p="${p.id}">✓ 로트 완료 기록</button>
-      <div class="btn-hint">이력에 남음 · 실제 포장할 때만 누르기</div>
-    </div>
-    <button class="btn btn-blue" style="margin-top:10px; width:100%;" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button>
-  ` : ''}
+  ${p.active ? `<div class="action-row-compact" style="margin-top:10px;"><button class="btn-compact solid" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button></div>` : ''}
   <div style="margin-top:10px;"></div>`;
 }
 
@@ -713,6 +722,16 @@ document.addEventListener('click', (e)=>{
     saveState(); renderAll();
   }
   else if(act==='addproduct'){ renderProductModalPresetList(mid); openModal('productModal'); }
+  else if(act==='openlotmodal'){
+    const m = findMachine(mid);
+    $('lotModalBody').innerHTML = `
+      <div class="input-group"><label class="input-label">로트번호</label><input type="text" id="lotnum_${pid}" value="${nextLotNumber(m)}"></div>
+      <div class="input-group"><label class="input-label">이번 로트 권취 길이 (m)</label><input type="number" id="lotamt_${pid}" placeholder=""></div>
+      <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="lotnote_${pid}" placeholder="예: 지관 변경, 재생원단 등"></div>
+      <button class="btn btn-blue" data-act="recordlot" data-m="${mid}" data-p="${pid}">✓ 로트 완료 기록</button>
+    `;
+    openModal('lotModal');
+  }
   else if(act==='pickpreset'){ renderProductModalConfirm(mid, btn.dataset.preset); }
   else if(act==='customproduct'){ renderProductModalConfirm(mid, null); }
   else if(act==='additem'){
@@ -794,7 +813,7 @@ document.addEventListener('click', (e)=>{
     if(!lotNumber){ alert('로트번호를 확인해주세요.'); return; }
     if(!(amount>0)){ alert('권취 길이를 입력해주세요.'); return; }
     p.histories.push({ id:uid('h'), type:'lot', label:p.name, lotNumber, amount:amount+'m', note, time:Date.now() });
-    saveState(); renderAll();
+    saveState(); renderAll(); closeModal('lotModal');
   }
   else if(act==='calccontainer'){
     const it = findItem(mid, pid, iid);
