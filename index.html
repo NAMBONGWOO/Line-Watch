@@ -39,7 +39,19 @@
   .sum-left{ flex:1; min-width:0; }
   .sum-left .name{ font-size:.9rem; font-weight:800; overflow-wrap:break-word; }
   .sum-left .kind{ font-size:.74rem; color:var(--text-dim); margin-top:1px; }
-  .sum-sub{ font-size:.7rem; color:var(--text-dim); margin-top:3px; padding-left:8px; border-left:2px solid var(--line); }
+  .sum-sub{ font-size:.7rem; color:var(--text-dim); margin-top:3px; padding-left:8px; border-left:2px solid var(--line); flex:1; }
+  .sum-sub-row{ display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .sum-action-btn{ padding:3px 9px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--text-dim); font-size:.66rem; font-weight:700; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+  .sum-action-btn.solid{ background:var(--warn); color:#fff; border-color:var(--warn); }
+  .machine-summary-group{ margin-bottom:10px; }
+  .machine-summary-header{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:9px; background:linear-gradient(180deg,#f8fafc,#eef2f6); border:1px solid var(--line); cursor:pointer; font-weight:800; font-size:.88rem; }
+  .ms-badge{ font-size:.68rem; padding:2px 8px; border-radius:20px; font-weight:700; }
+  .ms-badge.urgent{ background:#fce5e5; color:var(--warn); }
+  .ms-badge.calm{ background:#e5f2ea; color:var(--ok); }
+  .ms-arrow{ font-size:.7rem; color:var(--text-dim); transition:transform .15s; }
+  .ms-arrow.open{ transform:rotate(90deg); }
+  .machine-summary-body{ display:none; padding-top:7px; }
+  .machine-summary-body.open{ display:block; }
   .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:1.05rem; text-align:right; white-space:nowrap; flex-shrink:0; }
   .sum-time.urgent{ color:var(--warn); } .sum-time.soon{ color:#b3820f; } .sum-time.ok{ color:var(--ok); }
   .sum-time.paused{ color:var(--text-dim); font-size:.85rem; }
@@ -93,6 +105,7 @@
   input[type=number], input[type=text], select{ width:100%; padding:10px; background:#fff; border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:.92rem; }
   input:focus, select:focus{ outline:none; border-color:var(--blue); }
   .result-box{ background:#e5edf9; padding:10px; border-radius:8px; margin:10px 0; font-size:.75rem; color:var(--blue); font-weight:700; line-height:1.5; }
+  .preview-hint{ font-size:.72rem; color:var(--blue); font-weight:700; margin-top:5px; }
   .lot-box{ background:#e5edf9; border-radius:10px; padding:12px; margin-top:14px; }
   .lot-box .section-label{ color:var(--blue); margin-top:0; }
   .action-row-compact{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
@@ -110,6 +123,11 @@
   .preset-name{ font-weight:800; font-size:.85rem; }
   .preset-sub{ font-size:.7rem; color:var(--text-dim); margin-top:2px; }
   .btn-hint{ font-size:.68rem; color:var(--text-dim); text-align:center; margin-top:4px; }
+  .completed-product{ background:var(--card2); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; overflow:hidden; }
+  .completed-product summary{ list-style:none; cursor:pointer; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.82rem; font-weight:700; }
+  .completed-product summary::-webkit-details-marker{ display:none; }
+  .completed-meta{ font-size:.7rem; color:var(--text-dim); font-weight:600; white-space:nowrap; }
+  .completed-body{ padding:0 12px 10px; }
 </style>
 </head>
 <body>
@@ -135,8 +153,14 @@
       </div>
       <button class="btn-add" id="uploadPresetBtn" style="margin:0;">📤 프리셋 엑셀 업로드</button>
       <input type="file" id="presetFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+      <button class="btn-add" id="dailyCloseBtn" style="margin:8px 0 0; border-color:var(--amber); color:#b3820f;">🗓 일일 마감 (오늘 기록 스냅샷)</button>
     </div>
   </div>
+
+  <details class="card" style="padding:0;">
+    <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">일일 마감 기록</summary>
+    <div style="padding:0 16px 16px;" id="dailyClosuresList"><div class="empty-msg">아직 마감 기록 없음</div></div>
+  </details>
 
   <div class="card">
     <h2>지금 확인할 순서</h2>
@@ -220,12 +244,12 @@ const TYPE_KO = { roll:'원단롤', container:'점착제통', other:'기타' };
 
 function defaultItem(type, label, materialName){
   const base = { id:uid('it'), type, label, materialName: materialName||'' };
-  if(type==='roll') return Object.assign(base, { core_mm:103, t_um:null, L_total:null, H:null, speed:null, rollTarget:null, rollRemainM:null, checkpoints:[] });
+  if(type==='roll') return Object.assign(base, { core_mm:103, t_um:null, L_total:null, H:null, rollTarget:null, rollRemainM:null, checkpoints:[] });
   if(type==='container') return Object.assign(base, { curH:null, rate:null, minH:null, target:null });
   return Object.assign(base, { note:'' });
 }
-function defaultProduct(name, targetQty){
-  return { id:uid('p'), name, targetQty: targetQty||null, items:[], histories:[], active:true, endedAt:null };
+function defaultProduct(name, targetQty, speed){
+  return { id:uid('p'), name, targetQty: targetQty||null, speed: speed||null, items:[], histories:[], active:true, endedAt:null };
 }
 function defaultMachine(no){
   return { id:uid('m'), no, lotCode:'', paused:false, pausedAt:null, products:[] };
@@ -242,8 +266,9 @@ function itemFromPresetMaterial(mat){
 }
 
 function migrateState(s){
-  if(!s || !s.machines) return { machines:[], presets:[] };
+  if(!s || !s.machines) return { machines:[], presets:[], dailyClosures:[] };
   if(!s.presets) s.presets = [];
+  if(!s.dailyClosures) s.dailyClosures = [];
   s.machines.forEach(m=>{
     if(!m.products){
       const legacyItems = m.items || [];
@@ -258,7 +283,7 @@ function migrateState(s){
   return s;
 }
 
-let state = { machines:[], presets:[] };
+let state = { machines:[], presets:[], dailyClosures:[] };
 let firestoreReady = false;
 
 (function loadLocalCache(){
@@ -364,9 +389,9 @@ function H_fromLength(core_mm, t_um, L){
   return R - r0;
 }
 function fmtM(v){ return v==null ? '–' : v.toLocaleString(undefined,{maximumFractionDigits:1})+' m'; }
-function liveRemainM(it, refNow){
-  if(it.rollTarget==null || !(it.speed>0)) return null;
-  return Math.max(0, (it.rollTarget-refNow)/60000*it.speed);
+function liveRemainM(it, refNow, speed){
+  if(it.rollTarget==null || !(speed>0)) return null;
+  return Math.max(0, (it.rollTarget-refNow)/60000*speed);
 }
 function fmtCountdown(targetMs, refNow, paused){
   refNow = refNow ?? Date.now();
@@ -386,12 +411,12 @@ function distanceToCheckpoint(it, H_cp){
   const R = r0+it.H, R_cp = r0+H_cp;
   return Math.PI*(Math.pow(R,2)-Math.pow(R_cp,2)) / t_mm / 1000;
 }
-function recomputeCheckpoints(it){
+function recomputeCheckpoints(it, speed){
   const now = Date.now();
   it.checkpoints.forEach(cp=>{
     const dist = distanceToCheckpoint(it, cp.H_cp);
     if(dist===null){ cp.target=now; cp.distM=null; cp.invalid=true; }
-    else{ cp.target = now + (dist/it.speed)*60000; cp.distM=dist; cp.invalid=false; }
+    else{ cp.target = now + (dist/speed)*60000; cp.distM=dist; cp.invalid=false; }
   });
 }
 function pad2(n){ return String(n).padStart(2,'0'); }
@@ -421,6 +446,12 @@ function closeModal(id){ $(id).classList.remove('show'); }
 // ---- 렌더링 ----
 let closedMachines = new Set();
 
+function productTotalM(p){
+  let sum = 0;
+  p.histories.filter(h=>h.type==='lot').forEach(h=>{ const n = parseFloat(h.amount); if(!isNaN(n)) sum += n; });
+  return sum;
+}
+
 function machineHTML(m){
   const isOpen = !closedMachines.has(m.id);
   return `
@@ -434,7 +465,7 @@ function machineHTML(m){
       <span class="arrow">▶</span>
     </summary>
     <div class="machine-body">
-      <div id="products_${m.id}">${m.products.map(p=>productHTML(m,p)).join('')}</div>
+      <div id="products_${m.id}">${m.products.filter(p=>p.active).map(p=>productHTML(m,p)).join('')}${m.products.filter(p=>!p.active).sort((a,b)=>(b.endedAt||0)-(a.endedAt||0)).map(p=>completedProductHTML(m,p)).join('')}</div>
       <div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
       <div class="card-footer-actions">
         <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트코드: ${autoLotCode(m)||'미설정'}${m.lotCode?'':' (자동)'}</button>
@@ -447,9 +478,22 @@ function machineHTML(m){
 
 function progressText(p){
   if(!p.targetQty) return '';
-  let sum = 0;
-  p.histories.filter(h=>h.type==='lot').forEach(h=>{ const n = parseFloat(h.amount); if(!isNaN(n)) sum += n; });
+  const sum = productTotalM(p);
   return `누적 ${sum.toLocaleString()}m / 목표 ${p.targetQty.toLocaleString()}m`;
+}
+
+function completedProductHTML(m, p){
+  const total = productTotalM(p);
+  const dateStr = p.endedAt ? new Date(p.endedAt).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  return `<details class="completed-product">
+    <summary>
+      <span>▸ ${p.name}</span>
+      <span class="completed-meta">완료 · ${total.toLocaleString()}m · ${dateStr}</span>
+    </summary>
+    <div class="completed-body">
+      <div class="history-list" id="hist_${p.id}"></div>
+    </div>
+  </details>`;
 }
 
 function productHTML(m, p){
@@ -464,7 +508,7 @@ function productHTML(m, p){
       if(it.rollTarget){
         const diff = it.rollTarget-refNow;
         tier = diff<10*60000?'urgent':(diff<30*60000?'soon':'ok');
-        info = fmtM(liveRemainM(it, refNow)) + '<br>' + fmtCountdown(it.rollTarget, refNow, m.paused).text;
+        info = fmtM(liveRemainM(it, refNow, p.speed)) + '<br>' + fmtCountdown(it.rollTarget, refNow, m.paused).text;
       }
     }else if(it.type==='container'){
       if(it.target){
@@ -536,10 +580,11 @@ function renderHistories(){
 
 function renderCpListInModal(it, mid, pid){
   const m = findMachine(mid);
+  const p = findProduct(mid, pid);
   const refNow = nowFor(m);
   if(!it.checkpoints.length) return '<div class="empty-msg" style="font-size:.75rem;">체크포인트 없음</div>';
   const sorted = it.checkpoints.slice().map(cp=>{
-    const liveDist = cp.invalid ? null : Math.max(0, (cp.target-refNow)/60000*it.speed);
+    const liveDist = cp.invalid ? null : Math.max(0, (cp.target-refNow)/60000*p.speed);
     return { cp, liveDist };
   }).sort((a,b)=>{
     if(a.liveDist==null) return 1;
@@ -559,33 +604,41 @@ function renderCpListInModal(it, mid, pid){
   }).join('');
 }
 
+let summaryOverride = {}; // mid -> true(open)/false(closed), only set once user manually toggles
+
 function renderSummary(){
-  const groups = [];
+  const machineGroups = [];
   state.machines.forEach(m=>{
+    const itemGroups = [];
     m.products.filter(p=>p.active).forEach(p=>{
       const refNow = nowFor(m);
       p.items.forEach(it=>{
-        const name = `${m.no} · ${p.name} · ${it.label}`;
+        const name = `${p.name} · ${it.label}`;
         if(it.type==='roll'){
           if(!it.rollTarget) return;
-          const liveM = liveRemainM(it, refNow);
-          const subs = [{ target:it.rollTarget, kind:'롤 교체', dist:liveM, invalid:false }];
+          const liveM = liveRemainM(it, refNow, p.speed);
+          const subs = [{ target:it.rollTarget, kind:'롤 교체', dist:liveM, invalid:false, isRoll:true, pid:p.id, iid:it.id }];
           it.checkpoints.forEach(cp=>{
-            const liveD = cp.invalid ? null : Math.max(0, (cp.target-refNow)/60000*it.speed);
-            subs.push({ target:cp.target, kind:cp.label, dist:liveD, invalid:cp.invalid });
+            const liveD = cp.invalid ? null : Math.max(0, (cp.target-refNow)/60000*p.speed);
+            subs.push({ target:cp.target, kind:cp.label, dist:liveD, invalid:cp.invalid, isCp:true, pid:p.id, iid:it.id, cpId:cp.id });
           });
           subs.sort((a,b)=>a.target-b.target);
-          groups.push({ name, m, primary:subs[0], secondary:subs.slice(1) });
+          itemGroups.push({ name, primary:subs[0], secondary:subs.slice(1) });
         }else if(it.type==='container'){
           if(!it.target) return;
-          groups.push({ name, m, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false }, secondary:[] });
+          itemGroups.push({ name, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false }, secondary:[] });
         }
       });
     });
+    if(itemGroups.length){
+      itemGroups.sort((a,b)=>a.primary.target-b.primary.target);
+      machineGroups.push({ m, itemGroups });
+    }
   });
-  groups.sort((a,b)=>a.primary.target-b.primary.target);
+  machineGroups.sort((a,b)=> a.itemGroups[0].primary.target - b.itemGroups[0].primary.target);
+
   const el = $('summary-list');
-  if(!groups.length){ el.innerHTML = '<div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
+  if(!machineGroups.length){ el.innerHTML = '<div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div>'; return; }
 
   function distStr(dist){ return dist!=null ? ` · 약 ${dist.toLocaleString(undefined,{maximumFractionDigits:0})}m 남음` : ''; }
   function timeOf(sub, refNow, paused){
@@ -593,28 +646,107 @@ function renderSummary(){
     if(sub.invalid && !paused){ text='확인 필요'; tier='urgent'; }
     return {text, tier};
   }
+  function actionBtnHTML(sub, mid){
+    if(sub.isCp) return `<button class="sum-action-btn" data-act="quickdelcp" data-m="${mid}" data-p="${sub.pid}" data-i="${sub.iid}" data-cp="${sub.cpId}">✓</button>`;
+    if(sub.isRoll) return `<button class="sum-action-btn solid" data-act="openitemreplace" data-m="${mid}" data-p="${sub.pid}" data-i="${sub.iid}">교체</button>`;
+    return '';
+  }
 
-  el.innerHTML = groups.map(g=>{
-    const refNow = nowFor(g.m);
-    const p = timeOf(g.primary, refNow, g.m.paused);
-    const tierClass = p.tier==='urgent'?'urgent':(p.tier==='soon'?'soon':(p.tier==='paused'?'paused':''));
-    const secondaryHTML = g.secondary.map(s=>{
-      const st = timeOf(s, refNow, g.m.paused);
-      return `<div class="sum-sub">↳ ${s.kind}${distStr(s.dist)} · ${st.text}</div>`;
+  el.innerHTML = machineGroups.map(({m, itemGroups})=>{
+    const refNow = nowFor(m);
+    let urgentCount=0, soonCount=0;
+    itemGroups.forEach(g=>{
+      [g.primary, ...g.secondary].forEach(s=>{
+        const t = timeOf(s, refNow, m.paused).tier;
+        if(t==='urgent') urgentCount++; else if(t==='soon') soonCount++;
+      });
+    });
+    const hasUrgent = urgentCount>0;
+    const isOpen = summaryOverride.hasOwnProperty(m.id) ? summaryOverride[m.id] : hasUrgent;
+    const badge = hasUrgent ? `<span class="ms-badge urgent">긴급 ${urgentCount}건</span>`
+      : soonCount>0 ? `<span class="ms-badge urgent" style="background:#fef3e2; color:#b3820f;">곧 ${soonCount}건</span>`
+      : `<span class="ms-badge calm">여유</span>`;
+
+    const groupsHTML = itemGroups.map(g=>{
+      const pt = timeOf(g.primary, refNow, m.paused);
+      const tierClass = pt.tier==='urgent'?'urgent':(pt.tier==='soon'?'soon':(pt.tier==='paused'?'paused':''));
+      const primaryAction = actionBtnHTML(g.primary, m.id);
+      const secondaryHTML = g.secondary.map(s=>{
+        const st = timeOf(s, refNow, m.paused);
+        return `<div class="sum-sub-row">
+          <div class="sum-sub">↳ ${s.kind}${distStr(s.dist)} · ${st.text}</div>
+          ${actionBtnHTML(s, m.id)}
+        </div>`;
+      }).join('');
+      return `<div class="sum-row ${tierClass}">
+        <div class="sum-left"><div class="name">${g.name}</div><div class="kind">${g.primary.kind}${distStr(g.primary.dist)}</div>${secondaryHTML}</div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+          <div class="sum-time ${pt.tier}">${pt.text}</div>
+          ${primaryAction}
+        </div>
+      </div>`;
     }).join('');
-    return `<div class="sum-row ${tierClass}">
-      <div class="sum-left"><div class="name">${g.name}</div><div class="kind">${g.primary.kind}${distStr(g.primary.dist)}</div>${secondaryHTML}</div>
-      <div class="sum-time ${p.tier}">${p.text}</div>
+
+    return `<div class="machine-summary-group">
+      <div class="machine-summary-header" data-act="togglesummarymachine" data-m="${m.id}">
+        <span>${m.no}</span>
+        <span style="display:flex; align-items:center; gap:6px;">
+          ${badge}
+          <span class="ms-arrow ${isOpen?'open':''}">▶</span>
+        </span>
+      </div>
+      <div class="machine-summary-body ${isOpen?'open':''}">${groupsHTML}</div>
     </div>`;
   }).join('');
 }
 
-function renderAll(){ renderMachines(); renderHistories(); renderSummary(); }
+function computeDailySnapshot(){
+  const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+  const perMachine = state.machines.map(m=>{
+    let lots=0, lotTotal=0, replacements=0;
+    m.products.forEach(p=>p.histories.forEach(h=>{
+      if(h.time>=startOfDay.getTime()){
+        if(h.type==='lot'){ lots++; const n=parseFloat(h.amount); if(!isNaN(n)) lotTotal+=n; }
+        if(h.type==='replace') replacements++;
+      }
+    }));
+    return { mid:m.id, no:m.no, lots, lotTotal, replacements };
+  });
+  return { id:uid('dc'), time:Date.now(), perMachine };
+}
+function renderDailyClosures(){
+  const el = $('dailyClosuresList');
+  if(!el) return;
+  const list = (state.dailyClosures||[]).slice().reverse().slice(0,10);
+  if(!list.length){ el.innerHTML = '<div class="empty-msg">아직 마감 기록 없음</div>'; return; }
+  el.innerHTML = list.map(dc=>{
+    const dateStr = new Date(dc.time).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const lines = dc.perMachine.filter(pm=>pm.lots>0||pm.replacements>0).map(pm=>`${pm.no}: 로트${pm.lots}건(${pm.lotTotal.toLocaleString()}m)·교체${pm.replacements}건`).join('<br>');
+    return `<div class="history-item"><div class="history-text"><strong>${dateStr}</strong><br>${lines||'활동 없음'}</div></div>`;
+  }).join('');
+}
+$('dailyCloseBtn').addEventListener('click', ()=>{
+  if(!confirm('오늘 기록을 마감하시겠습니까? (진행 중인 작업은 계속됩니다)')) return;
+  if(!state.dailyClosures) state.dailyClosures = [];
+  state.dailyClosures.push(computeDailySnapshot());
+  saveState(); renderDailyClosures();
+});
+
+function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); }
 
 // ---- 항목 모달 ----
+function captureRollFieldsInProgress(it, iid){
+  const matEl = $(`mat_${iid}`), tEl = $(`t_${iid}`), LEl = $(`L_${iid}`), HEl = $(`H_${iid}`);
+  if(matEl) it.materialName = matEl.value.trim();
+  if(tEl && tEl.value!=='') it.t_um = parseFloat(tEl.value);
+  if(LEl && LEl.value!=='') it.L_total = parseFloat(LEl.value);
+  if(HEl && HEl.value!=='') it.H = parseFloat(HEl.value);
+}
+
 function renderItemModal(mid, pid, iid){
   const it = findItem(mid, pid, iid);
   const m = findMachine(mid);
+  const p = findProduct(mid, pid);
   const refNow = nowFor(m);
   let modalBody = '';
   if(it.type==='roll'){
@@ -622,9 +754,18 @@ function renderItemModal(mid, pid, iid){
     modalBody = `
       <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
       <div class="row2">
-        <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}"></div>
-        <div class="input-group"><label class="input-label">초기 총 길이 (m)</label><input type="number" id="L_${iid}" value="${it.L_total??''}"></div>
+        <div class="input-group">
+          <label class="input-label">초기 총 길이 (m)</label>
+          <input type="number" id="L_${iid}" value="${it.L_total??''}" data-act="linkpreview" data-i="${iid}">
+          <div class="preview-hint" id="Lpreview_${iid}">→ <span id="LpreviewText_${iid}">–</span></div>
+        </div>
+        <div class="input-group">
+          <label class="input-label">쌓인 두께 H (mm)</label>
+          <input type="number" id="H_${iid}" value="${it.H??''}" data-act="linkpreview" data-i="${iid}">
+          <div class="preview-hint" id="Hpreview_${iid}">→ <span id="HpreviewText_${iid}">–</span></div>
+        </div>
       </div>
+      <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}" data-act="linkpreview" data-i="${iid}"></div>
       <div class="input-group">
         <label class="input-label">지관 크기</label>
         <div class="row2">
@@ -632,13 +773,10 @@ function renderItemModal(mid, pid, iid){
           <button class="btn ${it.core_mm===182?'btn-blue':'btn-ghost'}" data-act="core182" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="padding:8px;">182mm</button>
         </div>
       </div>
-      <div class="row2">
-        <div class="input-group"><label class="input-label">쌓인 두께 H (mm)</label><input type="number" id="H_${iid}" value="${it.H??''}"></div>
-        <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="speed_${iid}" value="${it.speed??''}"></div>
-      </div>
+      <div class="btn-hint" style="text-align:left; margin-bottom:8px;">생산속도: ${p.speed??'미설정'} m/min (제품 공통값)</div>
       <button class="btn btn-ghost" data-act="calcroll" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">측정값 업데이트</button>
       <div class="btn-hint">이력 안 남음 · 현재 잔량만 재계산</div>
-      ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
+      ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow, p.speed))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
       <div class="section-label">체크포인트</div>
       <div class="history-list">${cpListHtml}</div>
       <div class="row2">
@@ -647,7 +785,7 @@ function renderItemModal(mid, pid, iid){
       </div>
       <button class="btn btn-ghost" data-act="addcp" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%; margin-top:8px;">+ 체크포인트 추가</button>
 
-      <div class="lot-box" style="background:#fef3e2;">
+      <div class="lot-box" style="background:#fef3e2;" id="replaceBox_${iid}">
         <div class="section-label" style="color:#b3820f;">🔄 자재 교체</div>
         <div class="input-group"><label class="input-label">새 원단 길이 (m)</label><input type="number" id="replaceLen_${iid}" placeholder="예: 6100"></div>
         <div class="input-group"><label class="input-label">원자재 로트번호 (수입원단 등, 선택)</label><input type="text" id="replaceMatLot_${iid}" placeholder="없으면 비워두세요"></div>
@@ -711,7 +849,10 @@ function renderProductModalConfirm(mid, presetId){
   const preset = presetId ? state.presets.find(p=>p.id===presetId) : null;
   $('productModalBody').innerHTML = `
     <div class="input-group"><label class="input-label">제품명</label><input type="text" id="newProductName" value="${preset?preset.name:''}"></div>
-    <div class="input-group"><label class="input-label">목표 수량 (작업지시서, m)</label><input type="number" id="newProductQty" placeholder=""></div>
+    <div class="row2">
+      <div class="input-group"><label class="input-label">목표 수량 (작업지시서, m)</label><input type="number" id="newProductQty" placeholder=""></div>
+      <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="newProductSpeed" placeholder=""></div>
+    </div>
     ${preset ? `<div class="section-label">자동 생성될 항목</div>` + preset.materials.map(mt=>`
       <div class="history-item"><div class="history-text"><strong>${mt.position}</strong><br>${mt.materialName||''} · ${mt.type}</div></div>
     `).join('') : ''}
@@ -724,7 +865,8 @@ function renderProductModalConfirm(mid, presetId){
     const name = $('newProductName').value.trim();
     if(!name){ alert('제품명을 입력하세요.'); return; }
     const qty = parseFloat($('newProductQty').value) || null;
-    const product = defaultProduct(name, qty);
+    const speed = parseFloat($('newProductSpeed').value) || null;
+    const product = defaultProduct(name, qty, speed);
     if(preset) product.items = preset.materials.map(itemFromPresetMaterial);
     findMachine(mid).products.push(product);
     saveState(); renderAll(); closeModal('productModal');
@@ -732,14 +874,67 @@ function renderProductModalConfirm(mid, presetId){
 }
 
 // ---- 클릭 위임 ----
+document.addEventListener('input', (e)=>{
+  if(e.target.dataset && e.target.dataset.act==='linkpreview'){
+    const iid = e.target.dataset.i;
+    const mid = findMachineIdByItem_(iid);
+    if(!mid) return;
+    const it = findItem(mid, findProductIdByItem_(mid, iid), iid);
+    if(!it) return;
+    const t = parseFloat($(`t_${iid}`).value);
+    const L = parseFloat($(`L_${iid}`).value);
+    const H = parseFloat($(`H_${iid}`).value);
+    const LpreviewText = $(`LpreviewText_${iid}`);
+    const HpreviewText = $(`HpreviewText_${iid}`);
+    if(LpreviewText){
+      const predH = H_fromLength(it.core_mm, t, L);
+      LpreviewText.textContent = predH!=null ? `예상 쌓인두께: ${predH.toFixed(1)}mm` : '–';
+    }
+    if(HpreviewText){
+      const predL = rollRemainingM(it.core_mm, t, H);
+      HpreviewText.textContent = predL!=null ? `예상 초기총길이: ${predL.toLocaleString(undefined,{maximumFractionDigits:1})}m` : '–';
+    }
+  }
+});
+function findMachineIdByItem_(iid){
+  for(const m of state.machines){ for(const p of m.products){ if(p.items.some(i=>i.id===iid)) return m.id; } }
+  return null;
+}
+function findProductIdByItem_(mid, iid){
+  const m = findMachine(mid);
+  for(const p of m.products){ if(p.items.some(i=>i.id===iid)) return p.id; }
+  return null;
+}
+
 document.addEventListener('click', (e)=>{
-  const btn = e.target.closest('button, .preset-item, .item-btn');
+  const btn = e.target.closest('button, .preset-item, .item-btn, .machine-summary-header');
   if(!btn) return;
   const act = btn.dataset.act;
   if(!act) return;
   const mid = btn.dataset.m, pid = btn.dataset.p, iid = btn.dataset.i, hid = btn.dataset.h;
 
-  if(act==='togglepause'){
+  if(act==='togglesummarymachine'){
+    const header = e.target.closest('.machine-summary-header');
+    const body = header.nextElementSibling;
+    const currentlyOpen = body.classList.contains('open');
+    summaryOverride[mid] = !currentlyOpen;
+    renderSummary();
+  }
+  else if(act==='quickdelcp'){
+    const it = findItem(mid, pid, iid);
+    const cpid = btn.dataset.cp;
+    it.checkpoints = it.checkpoints.filter(c=>c.id!==cpid);
+    saveState(); renderAll();
+  }
+  else if(act==='openitemreplace'){
+    renderItemModal(mid, pid, iid);
+    openModal('itemModal');
+    setTimeout(()=>{
+      const box = $(`replaceBox_${iid}`);
+      if(box) box.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 150);
+  }
+  else if(act==='togglepause'){
     e.stopPropagation();
     const m = findMachine(mid);
     if(!m.paused){ m.paused=true; m.pausedAt=Date.now(); }
@@ -792,16 +987,17 @@ document.addEventListener('click', (e)=>{
   else if(act==='openitem'){ renderItemModal(mid, pid, iid); openModal('itemModal'); }
   else if(act==='replaceroll'){
     const it = findItem(mid, pid, iid);
-    it.materialName = $(`mat_${iid}`).value.trim();
+    const prod = findProduct(mid, pid);
+    captureRollFieldsInProgress(it, iid);
     const len = parseFloat($(`replaceLen_${iid}`).value);
     const matLot = $(`replaceMatLot_${iid}`).value.trim();
     const note = $(`replaceNote_${iid}`).value.trim();
     if(!(len>0)){ alert('새 원단 길이(m)를 입력해주세요.'); return; }
     if(!(it.t_um>0) || !(it.core_mm>0)){ alert('원단 두께와 지관 크기를 먼저 확인해주세요.'); return; }
     // 교체 전, 이전 원단에서 실제로 사용한 길이 계산 (끝까지 썼든 잔량 남기고 교체했든)
-    const prevLiveRemain = liveRemainM(it, Date.now());
+    const prevLiveRemain = liveRemainM(it, Date.now(), prod.speed);
     const usedAmount = (it.L_total!=null && prevLiveRemain!=null) ? Math.max(0, it.L_total - prevLiveRemain) : null;
-    findProduct(mid, pid).histories.push({
+    prod.histories.push({
       id:uid('h'), type:'replace', label:it.label, materialName:it.materialName,
       amount: usedAmount!=null ? usedAmount.toLocaleString(undefined,{maximumFractionDigits:1})+'m 사용' : '',
       matLot, note, time:Date.now()
@@ -809,7 +1005,7 @@ document.addEventListener('click', (e)=>{
     it.L_total = len;
     it.H = H_fromLength(it.core_mm, it.t_um, len);
     it.rollRemainM = len;
-    it.rollTarget = (it.speed>0) ? Date.now() + (len/it.speed)*60000 : null;
+    it.rollTarget = (prod.speed>0) ? Date.now() + (len/prod.speed)*60000 : null;
     it.checkpoints = [];
     it.materialLotNumber = matLot;
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
@@ -826,17 +1022,18 @@ document.addEventListener('click', (e)=>{
   }
   else if(act==='calcroll'){
     const it = findItem(mid, pid, iid);
+    const prod = findProduct(mid, pid);
     it.materialName = $(`mat_${iid}`).value.trim();
     const t_um = parseFloat($(`t_${iid}`).value);
     const L_total = parseFloat($(`L_${iid}`).value);
     const H = parseFloat($(`H_${iid}`).value);
-    const speed = parseFloat($(`speed_${iid}`).value);
-    if(!(t_um>0) || !(H>=0) || !(speed>0)){ alert('값을 확인해주세요.'); return; }
-    it.t_um=t_um; it.L_total=L_total; it.H=H; it.speed=speed;
+    if(!(t_um>0) || !(H>=0)){ alert('값을 확인해주세요.'); return; }
+    if(!(prod.speed>0)){ alert('제품의 생산속도가 설정되어 있지 않습니다. 제품 상세에서 먼저 설정해주세요.'); return; }
+    it.t_um=t_um; it.L_total=L_total; it.H=H;
     const remainM = rollRemainingM(it.core_mm, t_um, H);
     it.rollRemainM=remainM;
-    it.rollTarget = Date.now() + (remainM/speed)*60000;
-    recomputeCheckpoints(it);
+    it.rollTarget = Date.now() + (remainM/prod.speed)*60000;
+    recomputeCheckpoints(it, prod.speed);
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='recordlot'){
@@ -888,7 +1085,16 @@ document.addEventListener('click', (e)=>{
     const h = p.histories.find(hh=>hh.id===hid);
     if(!h) return;
     const newAmount = prompt('수정할 수량을 입력하세요', h.amount);
-    if(newAmount!==null && newAmount.trim()){ h.amount = newAmount.trim(); saveState(); renderAll(); }
+    if(newAmount===null) return;
+    const d = new Date(h.time);
+    const defaultTimeStr = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const newTimeStr = prompt('시간을 수정하세요 (YYYY-MM-DD HH:MM)', defaultTimeStr);
+    if(newTimeStr===null) return;
+    if(newAmount.trim()) h.amount = newAmount.trim();
+    const parsed = new Date(newTimeStr.trim().replace(' ','T'));
+    if(!isNaN(parsed.getTime())) h.time = parsed.getTime();
+    else alert('시간 형식을 확인 못해 시간은 반영되지 않았습니다 (수량만 반영됨).');
+    saveState(); renderAll();
   }
   else if(act==='delhist'){
     if(confirm('이 이력을 삭제하시겠습니까?')){
@@ -913,22 +1119,27 @@ document.addEventListener('click', (e)=>{
   }
   else if(act==='core103' || act==='core182'){
     const it = findItem(mid, pid, iid);
+    captureRollFieldsInProgress(it, iid);
     it.core_mm = act==='core103' ? 103 : 182;
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='addcp'){
     const it = findItem(mid, pid, iid);
+    const prod = findProduct(mid, pid);
+    captureRollFieldsInProgress(it, iid);
     const label = $(`cplabel_${iid}`).value.trim();
     const H_cp = parseFloat($(`cpH_${iid}`).value);
     if(!label){ alert('이름을 입력해주세요.'); return; }
     if(!(H_cp>=0) || H_cp >= it.H){ alert('높이값을 확인해주세요.'); return; }
+    if(!(prod.speed>0)){ alert('제품의 생산속도가 설정되어 있지 않습니다.'); return; }
     const dist = distanceToCheckpoint(it, H_cp);
-    it.checkpoints.push({ id:uid('cp'), label, H_cp, distM:dist, target:Date.now()+(dist/it.speed)*60000, invalid:false });
+    it.checkpoints.push({ id:uid('cp'), label, H_cp, distM:dist, target:Date.now()+(dist/prod.speed)*60000, invalid:false });
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='editcp'){
     const cpid = btn.dataset.cp;
     const it = findItem(mid, pid, iid);
+    const prod = findProduct(mid, pid);
     const cp = it.checkpoints.find(c=>c.id===cpid);
     if(!cp) return;
     const newLabel = prompt('이음매 이름', cp.label);
@@ -940,7 +1151,7 @@ document.addEventListener('click', (e)=>{
     cp.label = newLabel.trim() || cp.label;
     cp.H_cp = H_cp;
     const dist = distanceToCheckpoint(it, H_cp);
-    cp.distM = dist; cp.target = Date.now()+(dist/it.speed)*60000; cp.invalid = false;
+    cp.distM = dist; cp.target = Date.now()+(dist/prod.speed)*60000; cp.invalid = false;
     saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='delcp'){
