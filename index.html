@@ -16,15 +16,18 @@
     --warn:#d6483f; --amber:#e0a417; --ok:#3f8f5f;
   }
   *{box-sizing:border-box;}
-  body{ margin:0; padding:18px 14px 50px; background:linear-gradient(180deg,#f7f9fb 0%, var(--bg) 220px);
+  body{ margin:0; padding:18px 14px 84px; background:linear-gradient(180deg,#f7f9fb 0%, var(--bg) 220px);
     color:var(--text); font-family:'Segoe UI','Pretendard',-apple-system,sans-serif; max-width:480px; margin-left:auto; margin-right:auto; }
   .eyebrow{ font-size:.72rem; letter-spacing:.18em; color:var(--blue); text-transform:uppercase; font-weight:800; margin-bottom:4px; }
   h1{ font-size:1.4rem; margin:0; font-weight:800; letter-spacing:-.01em; color:var(--text); }
   .header-row{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
-  .settings-icon{ width:36px; height:36px; border-radius:50%; background:#fff; border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px; box-shadow:0 1px 3px rgba(30,50,80,.08); cursor:pointer; flex-shrink:0; }
-  .settings-icon.logged-in{ background:var(--blue); border-color:var(--blue); }
-  #authPanel{ display:none; margin-bottom:14px; }
-  #authPanel.show{ display:block; }
+  .bottom-tabs{ position:fixed; left:0; right:0; bottom:0; display:flex; background:#fff; border-top:1px solid var(--line); box-shadow:0 -2px 10px rgba(30,50,80,.06); z-index:50; padding-bottom:env(safe-area-inset-bottom); max-width:480px; margin:0 auto; }
+  .tab-btn{ flex:1; padding:12px 4px 10px; border:0; background:transparent; color:var(--text-dim); font-size:.78rem; font-weight:700; cursor:pointer; }
+  .tab-btn.active{ color:var(--blue); font-weight:800; }
+  .autocomplete-list{ margin-top:4px; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .ac-item{ padding:8px 10px; font-size:.82rem; cursor:pointer; border-bottom:1px solid var(--line); background:#fff; }
+  .ac-item:last-child{ border-bottom:0; }
+  .ac-item.ac-empty{ color:var(--text-dim); cursor:default; }
 
   .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(30,50,80,.06); }
   .card h2{ font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); margin:0 0 12px; font-weight:800; }
@@ -137,10 +140,36 @@
       <div class="eyebrow">Production Line Monitor</div>
       <h1>라인워치</h1>
     </div>
-    <div class="settings-icon" id="settingsIcon">⚙️</div>
   </div>
 
-  <div id="authPanel">
+  <!-- ===== 생산 페이지 ===== -->
+  <div class="page" id="page-production">
+    <div class="card">
+      <h2>지금 확인할 순서</h2>
+      <div id="summary-list"><div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div></div>
+    </div>
+
+    <div id="machines-container"></div>
+    <button class="btn-add" id="add-machine">+ 기계 추가</button>
+  </div>
+
+  <!-- ===== 이력 페이지 ===== -->
+  <div class="page" id="page-history" style="display:none;">
+    <div class="card">
+      <h2>이력 조회</h2>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">기계</label><select id="histFilterMachine"><option value="">전체</option></select></div>
+        <div class="input-group"><label class="input-label">날짜</label><input type="date" id="histFilterDate"></div>
+      </div>
+      <button class="btn btn-ghost" id="histClearFilter" style="width:100%;">필터 초기화</button>
+    </div>
+    <div class="card">
+      <div id="historyList"><div class="empty-msg">이력이 없습니다</div></div>
+    </div>
+  </div>
+
+  <!-- ===== 등록 페이지 ===== -->
+  <div class="page" id="page-register" style="display:none;">
     <div class="card" id="auth-logged-out" style="display:flex; gap:8px; flex-wrap:wrap;">
       <input type="email" id="login-email" placeholder="이메일" style="flex:1; min-width:100px;">
       <input type="password" id="login-pw" placeholder="비밀번호" style="flex:1; min-width:100px;">
@@ -160,25 +189,23 @@
       <button class="btn-add" id="uploadPresetBtn" style="margin:0;">📤 대량 업로드 (엑셀/CSV)</button>
       <input type="file" id="presetFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
     </div>
+
+    <details class="card" style="padding:0;">
+      <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">자재 라이브러리</summary>
+      <div style="padding:0 16px 16px;" id="materialLibraryList"><div class="empty-msg">등록된 자재 없음</div></div>
+    </details>
+
+    <details class="card" style="padding:0;">
+      <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">일일 마감 기록</summary>
+      <div style="padding:0 16px 16px;" id="dailyClosuresList"><div class="empty-msg">아직 마감 기록 없음</div></div>
+    </details>
   </div>
 
-  <details class="card" style="padding:0;">
-    <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">자재 라이브러리</summary>
-    <div style="padding:0 16px 16px;" id="materialLibraryList"><div class="empty-msg">등록된 자재 없음</div></div>
-  </details>
-
-  <details class="card" style="padding:0;">
-    <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">일일 마감 기록</summary>
-    <div style="padding:0 16px 16px;" id="dailyClosuresList"><div class="empty-msg">아직 마감 기록 없음</div></div>
-  </details>
-
-  <div class="card">
-    <h2>지금 확인할 순서</h2>
-    <div id="summary-list"><div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div></div>
+  <div class="bottom-tabs">
+    <button class="tab-btn active" data-page="production">🏭 생산</button>
+    <button class="tab-btn" data-page="history">📋 이력</button>
+    <button class="tab-btn" data-page="register">⚙️ 등록</button>
   </div>
-
-  <div id="machines-container"></div>
-  <button class="btn-add" id="add-machine">+ 기계 추가</button>
 
   <!-- 신규 제품 모달 -->
   <div class="modal-overlay" id="productModal">
@@ -341,9 +368,7 @@ auth.onAuthStateChanged((user)=>{
   document.body.classList.toggle('readonly', !isLoggedIn);
   $('auth-logged-out').style.display = isLoggedIn ? 'none' : 'flex';
   $('auth-logged-in').style.display = isLoggedIn ? 'block' : 'none';
-  $('settingsIcon').classList.toggle('logged-in', isLoggedIn);
 });
-$('settingsIcon').addEventListener('click', ()=> $('authPanel').classList.toggle('show'));
 $('login-btn').addEventListener('click', ()=>{
   const email = $('login-email').value.trim();
   const pw = $('login-pw').value;
@@ -351,6 +376,17 @@ $('login-btn').addEventListener('click', ()=>{
   auth.signInWithEmailAndPassword(email, pw).then(()=>{ $('login-pw').value=''; }).catch(err=>alert('로그인 실패: '+err.message));
 });
 $('logout-btn').addEventListener('click', ()=>auth.signOut());
+
+// ---- 탭 전환 ----
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+    $(`page-${btn.dataset.page}`).style.display='block';
+    if(btn.dataset.page==='history') renderHistoryPage();
+  });
+});
 
 // ---- 프리셋 엑셀 업로드 ----
 $('uploadPresetBtn').addEventListener('click', ()=> $('presetFileInput').click());
@@ -625,6 +661,62 @@ function renderHistories(){
   });
 }
 
+function refreshHistFilterOptions(){
+  const sel = $('histFilterMachine');
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">전체</option>' + state.machines.map(m=>`<option value="${m.id}">${m.no}</option>`).join('');
+  if(state.machines.some(m=>m.id===cur)) sel.value = cur;
+}
+
+function renderHistoryPage(){
+  refreshHistFilterOptions();
+  const el = $('historyList');
+  if(!el) return;
+  const machineFilter = $('histFilterMachine') ? $('histFilterMachine').value : '';
+  const dateFilter = $('histFilterDate') ? $('histFilterDate').value : '';
+  let entries = [];
+  state.machines.forEach(m=>{
+    if(machineFilter && m.id!==machineFilter) return;
+    m.products.forEach(p=>{
+      p.histories.forEach(h=>{
+        entries.push(Object.assign({}, h, { machineName:m.no, productName:p.name, mid:m.id, pid:p.id }));
+      });
+    });
+  });
+  if(dateFilter){
+    entries = entries.filter(h=>{
+      const d = new Date(h.time);
+      const ds = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+      return ds===dateFilter;
+    });
+  }
+  entries.sort((a,b)=>b.time-a.time);
+  if(!entries.length){ el.innerHTML = '<div class="empty-msg">해당 조건의 이력이 없습니다</div>'; return; }
+  el.innerHTML = entries.map(h=>{
+    const typeLabel = h.type==='lot' ? '로트 완료' : h.type==='replace' ? '자재 교체' : '생산 종료';
+    const posLine = h.type==='replace' ? `${h.label}${h.materialName?' · '+h.materialName:''}${h.matLot?' · 원자재로트 '+h.matLot:''}<br>` : '';
+    return `
+    <div class="history-item">
+      <div class="history-text">
+        <strong>${h.machineName} · ${h.productName}</strong><br>
+        ${typeLabel}${h.lotNumber?' · '+h.lotNumber:''}<br>
+        ${posLine}${h.amount ? h.amount+' · ':''}${new Date(h.time).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+        ${h.note?'<br><span style="color:var(--text-dim);">'+h.note+'</span>':''}
+      </div>
+      <div class="history-actions">
+        <button class="history-btn" data-act="edithist" data-m="${h.mid}" data-p="${h.pid}" data-h="${h.id}">수정</button>
+        <button class="history-btn" data-act="delhist" data-m="${h.mid}" data-p="${h.pid}" data-h="${h.id}">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+$('histFilterMachine') && $('histFilterMachine').addEventListener('change', renderHistoryPage);
+$('histFilterDate') && $('histFilterDate').addEventListener('change', renderHistoryPage);
+$('histClearFilter') && $('histClearFilter').addEventListener('click', ()=>{
+  $('histFilterMachine').value=''; $('histFilterDate').value=''; renderHistoryPage();
+});
+
 function renderCpListInModal(it, mid, pid){
   const m = findMachine(mid);
   const p = findProduct(mid, pid);
@@ -779,7 +871,7 @@ $('dailyCloseBtn').addEventListener('click', ()=>{
   saveState(); renderDailyClosures();
 });
 
-function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); renderMaterialLibrary(); }
+function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); renderMaterialLibrary(); renderHistoryPage(); }
 
 // ---- 항목 모달 ----
 function captureRollFieldsInProgress(it, iid){
@@ -879,18 +971,28 @@ function renderItemModal(mid, pid, iid){
 }
 
 // ---- 신규 제품 모달 ----
-function renderProductModalPresetList(mid){
-  const grid = state.presets.length ? state.presets.map(preset=>`
+function renderPresetPickResults(mid, query){
+  const q = (query||'').trim().toLowerCase();
+  const matched = q ? state.presets.filter(p=>p.name.toLowerCase().includes(q)) : state.presets;
+  const capped = matched.slice(0, 6);
+  const listEl = $('presetPickList');
+  if(!state.presets.length){ listEl.innerHTML = '<div class="empty-msg">등록된 프리셋이 없습니다</div>'; return; }
+  if(!capped.length){ listEl.innerHTML = '<div class="empty-msg">일치하는 프리셋이 없습니다</div>'; return; }
+  listEl.innerHTML = capped.map(preset=>`
     <div class="preset-item" data-act="pickpreset" data-m="${mid}" data-preset="${preset.id}">
       <div class="preset-name">${preset.name}</div>
       <div class="preset-sub">${preset.materials.map(mt=>mt.position).join('·')} · ${preset.materials.length}개 항목</div>
-    </div>`).join('') : '<div class="empty-msg">등록된 프리셋이 없습니다</div>';
+    </div>`).join('') + (matched.length>6 ? `<div class="btn-hint">총 ${matched.length}개 중 6개 표시 — 검색으로 좁혀보세요</div>` : '');
+}
+function renderProductModalPresetList(mid){
   $('productModalBody').innerHTML = `
     <div class="section-label">프리셋에서 선택</div>
-    <div id="presetPickList">${grid}</div>
-    <div class="preset-item" data-act="customproduct" data-m="${mid}" style="border-style:dashed; text-align:center; color:var(--blue); font-weight:700;">+ 프리셋 없이 직접 구성</div>
-    <button class="btn btn-ghost" style="width:100%;" onclick="closeModal('productModal')">취소</button>
+    <input type="text" id="presetSearchInput" placeholder="제품명 검색..." autocomplete="off" oninput="renderPresetPickResults('${mid}', this.value)">
+    <div id="presetPickList" style="margin-top:8px;"></div>
+    <div class="preset-item" data-act="customproduct" data-m="${mid}" style="border-style:dashed; text-align:center; color:var(--blue); font-weight:700; margin-top:8px;">+ 프리셋 없이 직접 구성</div>
+    <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="closeModal('productModal')">취소</button>
   `;
+  renderPresetPickResults(mid, '');
 }
 function renderProductModalConfirm(mid, presetId){
   const preset = presetId ? state.presets.find(p=>p.id===presetId) : null;
@@ -986,17 +1088,15 @@ function renderMaterialModal(){
 $('addMaterialBtn').addEventListener('click', ()=>{ renderMaterialModal(); openModal('materialModal'); });
 
 // ---- 제품 프리셋 개별 등록 (자재 라이브러리에서 골라 구성) ----
+let presetSlotSelections = {};
 function renderPresetBuilderModal(){
+  presetSlotSelections = {};
   const slotsHtml = ITEM_PRESETS.map((slot, idx)=>{
-    const candidates = state.materialLibrary.filter(m=>m.type===slot.type);
-    const options = ['<option value="">(선택 안함)</option>']
-      .concat(candidates.map(m=>`<option value="${m.id}">${m.name}</option>`))
-      .concat(['<option value="__custom__">(직접 입력...)</option>']).join('');
     return `
       <div class="input-group">
         <label class="input-label">${slot.label} (${TYPE_KO[slot.type]})</label>
-        <select id="slotSel_${idx}" onchange="onPresetSlotChange(${idx})">${options}</select>
-        <input type="text" id="slotCustom_${idx}" placeholder="자재명 직접 입력" style="display:none; margin-top:6px;">
+        <input type="text" id="slotSearch_${idx}" placeholder="자재명 검색 또는 직접 입력" autocomplete="off" oninput="onSlotSearch(${idx})">
+        <div class="autocomplete-list" id="slotResults_${idx}"></div>
       </div>`;
   }).join('');
   $('presetBuilderModalBody').innerHTML = `
@@ -1010,16 +1110,13 @@ function renderPresetBuilderModal(){
     if(!name){ alert('제품명을 입력하세요.'); return; }
     const materials = [];
     ITEM_PRESETS.forEach((slot, idx)=>{
-      const sel = $(`slotSel_${idx}`).value;
-      if(!sel) return;
-      if(sel==='__custom__'){
-        const cname = $(`slotCustom_${idx}`).value.trim();
-        if(!cname) return;
-        materials.push({ position:slot.label, materialName:cname, type:TYPE_KO[slot.type], t_um:null, core_mm:slot.type==='roll'?103:null, L_total:null });
-      }else{
-        const mat = state.materialLibrary.find(m=>m.id===sel);
-        if(!mat) return;
-        materials.push({ position:slot.label, materialName:mat.name, type:TYPE_KO[mat.type], t_um:mat.t_um, core_mm:mat.core_mm, L_total:mat.L_total });
+      const sel = presetSlotSelections[idx];
+      const typedText = $(`slotSearch_${idx}`).value.trim();
+      if(sel && sel.matId){
+        const mat = state.materialLibrary.find(m=>m.id===sel.matId);
+        if(mat) materials.push({ position:slot.label, materialName:mat.name, type:TYPE_KO[mat.type], t_um:mat.t_um, core_mm:mat.core_mm, L_total:mat.L_total });
+      }else if(typedText){
+        materials.push({ position:slot.label, materialName:typedText, type:TYPE_KO[slot.type], t_um:null, core_mm:slot.type==='roll'?103:null, L_total:null });
       }
     });
     if(!materials.length){ alert('최소 하나의 위치에 자재를 선택해주세요.'); return; }
@@ -1030,9 +1127,23 @@ function renderPresetBuilderModal(){
     alert('제품 프리셋이 저장되었습니다.');
   };
 }
-function onPresetSlotChange(idx){
-  const sel = $(`slotSel_${idx}`).value;
-  $(`slotCustom_${idx}`).style.display = sel==='__custom__' ? 'block' : 'none';
+function onSlotSearch(idx){
+  presetSlotSelections[idx] = null;
+  const q = $(`slotSearch_${idx}`).value.trim().toLowerCase();
+  const results = $(`slotResults_${idx}`);
+  if(!q){ results.innerHTML=''; return; }
+  const slot = ITEM_PRESETS[idx];
+  const candidates = state.materialLibrary.filter(m=>m.type===slot.type && m.name.toLowerCase().includes(q)).slice(0,6);
+  results.innerHTML = candidates.length
+    ? candidates.map(m=>`<div class="ac-item" onclick="pickSlotMaterial(${idx}, '${m.id}')">${m.name}</div>`).join('')
+    : '<div class="ac-item ac-empty">일치하는 자재 없음 (그대로 입력하면 새 자재로 저장)</div>';
+}
+function pickSlotMaterial(idx, matId){
+  const mat = state.materialLibrary.find(m=>m.id===matId);
+  if(!mat) return;
+  $(`slotSearch_${idx}`).value = mat.name;
+  presetSlotSelections[idx] = { matId };
+  $(`slotResults_${idx}`).innerHTML = '';
 }
 $('addPresetBtn').addEventListener('click', ()=>{ renderPresetBuilderModal(); openModal('presetBuilderModal'); });
 
