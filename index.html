@@ -108,7 +108,9 @@
   input[type=number], input[type=text], select{ width:100%; padding:10px; background:#fff; border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:.92rem; }
   input:focus, select:focus{ outline:none; border-color:var(--blue); }
   .result-box{ background:#e5edf9; padding:10px; border-radius:8px; margin:10px 0; font-size:.75rem; color:var(--blue); font-weight:700; line-height:1.5; }
-  .preview-hint{ font-size:.72rem; color:var(--blue); font-weight:700; margin-top:5px; }
+  .preview-hint{ font-size:.72rem; color:var(--blue); font-weight:700; margin-top:5px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .preview-apply-btn{ padding:3px 9px; border-radius:6px; border:1px solid var(--blue); background:#fff; color:var(--blue); font-size:.66rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .preview-apply-btn:disabled{ opacity:.35; cursor:default; }
   .lot-box{ background:#e5edf9; border-radius:10px; padding:12px; margin-top:14px; }
   .lot-box .section-label{ color:var(--blue); margin-top:0; }
   .action-row-compact{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
@@ -159,8 +161,16 @@
       <h2>이력 조회</h2>
       <div class="row2">
         <div class="input-group"><label class="input-label">기계</label><select id="histFilterMachine"><option value="">전체</option></select></div>
-        <div class="input-group"><label class="input-label">날짜</label><input type="date" id="histFilterDate"></div>
+        <div class="input-group"><label class="input-label">구분</label>
+          <select id="histFilterType">
+            <option value="">전체</option>
+            <option value="lot">로트 완료</option>
+            <option value="replace">자재 교체</option>
+            <option value="end">생산 종료</option>
+          </select>
+        </div>
       </div>
+      <div class="input-group"><label class="input-label">날짜</label><input type="date" id="histFilterDate"></div>
       <button class="btn btn-ghost" id="histClearFilter" style="width:100%;">필터 초기화</button>
     </div>
     <div class="card">
@@ -196,15 +206,40 @@
     </details>
 
     <details class="card" style="padding:0;">
+      <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">제품 라이브러리 (프리셋)</summary>
+      <div style="padding:0 16px 16px;" id="presetLibraryList"><div class="empty-msg">등록된 프리셋 없음</div></div>
+    </details>
+
+    <details class="card" style="padding:0;">
       <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">일일 마감 기록</summary>
       <div style="padding:0 16px 16px;" id="dailyClosuresList"><div class="empty-msg">아직 마감 기록 없음</div></div>
     </details>
+  </div>
+
+  <!-- ===== 계산기 페이지 ===== -->
+  <div class="page" id="page-calc" style="display:none;">
+    <div class="card">
+      <h2>재고 원단 잔량 계산기</h2>
+      <div class="input-group">
+        <label class="input-label">지관 크기</label>
+        <div class="row2">
+          <button class="btn btn-blue" id="calcCore103" style="padding:10px;">103mm</button>
+          <button class="btn btn-ghost" id="calcCore182" style="padding:10px;">182mm</button>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="calcT" placeholder="예: 12" oninput="runCalc()"></div>
+        <div class="input-group"><label class="input-label">쌓인 두께 H (mm)</label><input type="number" id="calcH" placeholder="실측값" oninput="runCalc()"></div>
+      </div>
+      <div class="result-box" id="calcResult" style="font-size:1rem; text-align:center; padding:16px;">예상 잔량: –</div>
+    </div>
   </div>
 
   <div class="bottom-tabs">
     <button class="tab-btn active" data-page="production">🏭 생산</button>
     <button class="tab-btn" data-page="history">📋 이력</button>
     <button class="tab-btn" data-page="register">⚙️ 등록</button>
+    <button class="tab-btn" data-page="calc">🧮 계산기</button>
   </div>
 
   <!-- 신규 제품 모달 -->
@@ -376,6 +411,27 @@ $('login-btn').addEventListener('click', ()=>{
   auth.signInWithEmailAndPassword(email, pw).then(()=>{ $('login-pw').value=''; }).catch(err=>alert('로그인 실패: '+err.message));
 });
 $('logout-btn').addEventListener('click', ()=>auth.signOut());
+
+// ---- 계산기 탭 (재고 원단 잔량, 상태 저장 없음) ----
+let calcCoreMm = 103;
+$('calcCore103') && $('calcCore103').addEventListener('click', ()=>{
+  calcCoreMm = 103;
+  $('calcCore103').className='btn btn-blue'; $('calcCore182').className='btn btn-ghost';
+  runCalc();
+});
+$('calcCore182') && $('calcCore182').addEventListener('click', ()=>{
+  calcCoreMm = 182;
+  $('calcCore182').className='btn btn-blue'; $('calcCore103').className='btn btn-ghost';
+  runCalc();
+});
+function runCalc(){
+  const t = parseFloat($('calcT').value);
+  const H = parseFloat($('calcH').value);
+  const el = $('calcResult');
+  if(!el) return;
+  const L = rollRemainingM(calcCoreMm, t, H);
+  el.textContent = L!=null ? `예상 잔량: ${L.toLocaleString(undefined,{maximumFractionDigits:1})} m` : '예상 잔량: –';
+}
 
 // ---- 탭 전환 ----
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -621,8 +677,10 @@ function productHTML(m, p){
     <button class="btn-compact" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 항목 추가</button>
     ${p.active ? `<button class="btn-compact" data-act="openlotmodal" data-m="${m.id}" data-p="${p.id}">📦 로트 완료</button>` : ''}
   </div>
-  <div class="section-label">생산 이력</div>
-  <div class="history-list" id="hist_${p.id}"></div>
+  <details class="completed-product">
+    <summary><span>생산 이력</span><span class="completed-meta">${p.histories.length}건</span></summary>
+    <div class="completed-body"><div class="history-list" id="hist_${p.id}"></div></div>
+  </details>
   ${p.active ? `<div class="action-row-compact" style="margin-top:10px;"><button class="btn-compact solid" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button></div>` : ''}
   <div style="margin-top:10px;"></div>`;
 }
@@ -674,6 +732,7 @@ function renderHistoryPage(){
   const el = $('historyList');
   if(!el) return;
   const machineFilter = $('histFilterMachine') ? $('histFilterMachine').value : '';
+  const typeFilter = $('histFilterType') ? $('histFilterType').value : '';
   const dateFilter = $('histFilterDate') ? $('histFilterDate').value : '';
   let entries = [];
   state.machines.forEach(m=>{
@@ -684,6 +743,7 @@ function renderHistoryPage(){
       });
     });
   });
+  if(typeFilter) entries = entries.filter(h=>h.type===typeFilter);
   if(dateFilter){
     entries = entries.filter(h=>{
       const d = new Date(h.time);
@@ -712,9 +772,10 @@ function renderHistoryPage(){
   }).join('');
 }
 $('histFilterMachine') && $('histFilterMachine').addEventListener('change', renderHistoryPage);
+$('histFilterType') && $('histFilterType').addEventListener('change', renderHistoryPage);
 $('histFilterDate') && $('histFilterDate').addEventListener('change', renderHistoryPage);
 $('histClearFilter') && $('histClearFilter').addEventListener('click', ()=>{
-  $('histFilterMachine').value=''; $('histFilterDate').value=''; renderHistoryPage();
+  $('histFilterMachine').value=''; $('histFilterType').value=''; $('histFilterDate').value=''; renderHistoryPage();
 });
 
 function renderCpListInModal(it, mid, pid){
@@ -853,6 +914,22 @@ function computeDailySnapshot(){
   });
   return { id:uid('dc'), time:Date.now(), perMachine };
 }
+function entriesForDay(timestamp){
+  const d = new Date(timestamp);
+  const ds = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const entries = [];
+  state.machines.forEach(m=>{
+    m.products.forEach(p=>{
+      p.histories.forEach(h=>{
+        const hd = new Date(h.time);
+        const hds = `${hd.getFullYear()}-${pad2(hd.getMonth()+1)}-${pad2(hd.getDate())}`;
+        if(hds===ds) entries.push(Object.assign({}, h, { machineName:m.no, productName:p.name }));
+      });
+    });
+  });
+  entries.sort((a,b)=>a.time-b.time);
+  return entries;
+}
 function renderDailyClosures(){
   const el = $('dailyClosuresList');
   if(!el) return;
@@ -861,7 +938,15 @@ function renderDailyClosures(){
   el.innerHTML = list.map(dc=>{
     const dateStr = new Date(dc.time).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
     const lines = dc.perMachine.filter(pm=>pm.lots>0||pm.replacements>0).map(pm=>`${pm.no}: 로트${pm.lots}건(${pm.lotTotal.toLocaleString()}m)·교체${pm.replacements}건`).join('<br>');
-    return `<div class="history-item"><div class="history-text"><strong>${dateStr}</strong><br>${lines||'활동 없음'}</div></div>`;
+    const detailEntries = entriesForDay(dc.time);
+    const detailHtml = detailEntries.length ? detailEntries.map(h=>{
+      const typeLabel = h.type==='lot' ? '로트 완료' : h.type==='replace' ? '자재 교체' : '생산 종료';
+      return `<div class="history-item"><div class="history-text"><strong>${h.machineName} · ${h.productName}</strong><br>${typeLabel}${h.lotNumber?' · '+h.lotNumber:''}${h.amount?' · '+h.amount:''} · ${new Date(h.time).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}</div></div>`;
+    }).join('') : '<div class="empty-msg" style="font-size:.72rem;">세부 이력 없음</div>';
+    return `<details class="completed-product">
+      <summary><span>${dateStr}</span><span class="completed-meta">${lines||'활동 없음'}</span></summary>
+      <div class="completed-body">${detailHtml}</div>
+    </details>`;
   }).join('');
 }
 $('dailyCloseBtn').addEventListener('click', ()=>{
@@ -871,7 +956,7 @@ $('dailyCloseBtn').addEventListener('click', ()=>{
   saveState(); renderDailyClosures();
 });
 
-function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); renderMaterialLibrary(); renderHistoryPage(); }
+function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); renderMaterialLibrary(); renderPresetLibrary(); renderHistoryPage(); }
 
 // ---- 항목 모달 ----
 function captureRollFieldsInProgress(it, iid){
@@ -891,20 +976,22 @@ function renderItemModal(mid, pid, iid){
   if(it.type==='roll'){
     const cpListHtml = renderCpListInModal(it, mid, pid);
     modalBody = `
-      <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+        <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}" data-act="linkpreview" data-i="${iid}"></div>
+      </div>
       <div class="row2">
         <div class="input-group">
           <label class="input-label">초기 총 길이 (m)</label>
           <input type="number" id="L_${iid}" value="${it.L_total??''}" data-act="linkpreview" data-i="${iid}">
-          <div class="preview-hint" id="Lpreview_${iid}">→ <span id="LpreviewText_${iid}">–</span></div>
+          <div class="preview-hint" id="Lpreview_${iid}">→ <span id="LpreviewText_${iid}">–</span><button type="button" class="preview-apply-btn" id="LapplyBtn_${iid}" disabled onclick="applyLinkPreview('${iid}','H')">H에 적용</button></div>
         </div>
         <div class="input-group">
           <label class="input-label">쌓인 두께 H (mm)</label>
           <input type="number" id="H_${iid}" value="${it.H??''}" data-act="linkpreview" data-i="${iid}">
-          <div class="preview-hint" id="Hpreview_${iid}">→ <span id="HpreviewText_${iid}">–</span></div>
+          <div class="preview-hint" id="Hpreview_${iid}">→ <span id="HpreviewText_${iid}">–</span><button type="button" class="preview-apply-btn" id="HapplyBtn_${iid}" disabled onclick="applyLinkPreview('${iid}','L')">길이에 적용</button></div>
         </div>
       </div>
-      <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}" data-act="linkpreview" data-i="${iid}"></div>
       <div class="input-group">
         <label class="input-label">지관 크기</label>
         <div class="row2">
@@ -926,8 +1013,10 @@ function renderItemModal(mid, pid, iid){
 
       <div class="lot-box" style="background:#fef3e2;" id="replaceBox_${iid}">
         <div class="section-label" style="color:#b3820f;">🔄 자재 교체</div>
-        <div class="input-group"><label class="input-label">새 원단 길이 (m)</label><input type="number" id="replaceLen_${iid}" placeholder="예: 6100"></div>
-        <div class="input-group"><label class="input-label">원자재 로트번호 (수입원단 등, 선택)</label><input type="text" id="replaceMatLot_${iid}" placeholder="없으면 비워두세요"></div>
+        <div class="row2">
+          <div class="input-group"><label class="input-label">새 원단 길이 (m)</label><input type="number" id="replaceLen_${iid}" placeholder="예: 6100"></div>
+          <div class="input-group"><label class="input-label">원자재 로트번호 (선택)</label><input type="text" id="replaceMatLot_${iid}" placeholder="없으면 비워두세요"></div>
+        </div>
         <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="replaceNote_${iid}" placeholder="예: 재생원단, 지관 변경 등"></div>
         <button class="btn" style="width:100%; background:#e0a417; color:#fff;" data-act="replaceroll" data-m="${mid}" data-p="${pid}" data-i="${iid}">🔄 자재 교체 기록</button>
         <div class="btn-hint">새 원단으로 갈아 끼웠을 때만 누르기 · 이력에 남음</div>
@@ -935,12 +1024,14 @@ function renderItemModal(mid, pid, iid){
     `;
   }else if(it.type==='container'){
     modalBody = `
-      <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+      <div class="row2">
+        <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+        <div class="input-group"><label class="input-label">교체 기준 높이 (mm)</label><input type="number" id="minH_${iid}" value="${it.minH??''}"></div>
+      </div>
       <div class="row2">
         <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
         <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
       </div>
-      <div class="input-group"><label class="input-label">교체 기준 높이 (mm)</label><input type="number" id="minH_${iid}" value="${it.minH??''}"></div>
       <button class="btn btn-blue" data-act="calccontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">계산 업데이트</button>
       ${it.target ? `<div class="result-box">예상 교체까지<br>약 ${Math.floor((it.target-refNow)/3600000)}시간</div>` : ''}
       <div class="section-label">소모속도 모를 때 (자동 계산)</div>
@@ -953,8 +1044,10 @@ function renderItemModal(mid, pid, iid){
 
       <div class="lot-box" style="background:#fef3e2;">
         <div class="section-label" style="color:#b3820f;">🔄 자재 교체 (새 통)</div>
-        <div class="input-group"><label class="input-label">새 통 높이 (mm, 가득참 기준)</label><input type="number" id="replaceContH_${iid}" placeholder=""></div>
-        <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="replaceContNote_${iid}" placeholder=""></div>
+        <div class="row2">
+          <div class="input-group"><label class="input-label">새 통 높이 (mm, 가득참)</label><input type="number" id="replaceContH_${iid}" placeholder=""></div>
+          <div class="input-group"><label class="input-label">특이사항 (선택)</label><input type="text" id="replaceContNote_${iid}" placeholder=""></div>
+        </div>
         <button class="btn" style="width:100%; background:#e0a417; color:#fff;" data-act="replacecontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">🔄 자재 교체 기록</button>
         <div class="btn-hint">새 통으로 갈아 끼웠을 때만 누르기 · 이력에 남음</div>
       </div>
@@ -1030,13 +1123,31 @@ function renderMaterialLibrary(){
   el.innerHTML = state.materialLibrary.map(mat=>`
     <div class="history-item">
       <div class="history-text"><strong>${mat.name}</strong> · ${TYPE_KO[mat.type]||mat.type}<br>${mat.type==='roll'?`두께 ${mat.t_um??'–'}µm · 지관 ${mat.core_mm??'–'}mm · ${mat.L_total??'–'}m`:''}</div>
-      <button class="history-btn" data-act="delmaterial" data-mat="${mat.id}">삭제</button>
+      <div class="history-actions">
+        <button class="history-btn" data-act="editmaterial" data-mat="${mat.id}">수정</button>
+        <button class="history-btn" data-act="delmaterial" data-mat="${mat.id}">삭제</button>
+      </div>
     </div>`).join('');
 }
 
-function renderMaterialModal(){
+function renderPresetLibrary(){
+  const el = $('presetLibraryList');
+  if(!el) return;
+  if(!state.presets.length){ el.innerHTML = '<div class="empty-msg">등록된 프리셋 없음</div>'; return; }
+  el.innerHTML = state.presets.map(preset=>`
+    <div class="history-item">
+      <div class="history-text"><strong>${preset.name}</strong><br>${preset.materials.map(mt=>mt.position).join('·')} · ${preset.materials.length}개 항목</div>
+      <div class="history-actions">
+        <button class="history-btn" data-act="editpreset" data-preset="${preset.id}">수정</button>
+        <button class="history-btn" data-act="delpreset" data-preset="${preset.id}">삭제</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderMaterialModal(editId){
+  const existingMat = editId ? state.materialLibrary.find(m=>m.id===editId) : null;
   $('materialModalBody').innerHTML = `
-    <div class="input-group"><label class="input-label">자재명</label><input type="text" id="newMatName" placeholder="예: PET38단면 BOW 700"></div>
+    <div class="input-group"><label class="input-label">자재명</label><input type="text" id="newMatName" placeholder="예: PET38단면 BOW 700" value="${existingMat?existingMat.name:''}"></div>
     <div class="input-group">
       <label class="input-label">타입</label>
       <div class="row2" style="grid-template-columns:1fr 1fr 1fr; display:grid; gap:6px;">
@@ -1046,8 +1157,8 @@ function renderMaterialModal(){
       </div>
     </div>
     <div id="newMatRollFields" class="row2">
-      <div class="input-group"><label class="input-label">두께 (µm)</label><input type="number" id="newMatT"></div>
-      <div class="input-group"><label class="input-label">초기총길이 (m)</label><input type="number" id="newMatL"></div>
+      <div class="input-group"><label class="input-label">두께 (µm)</label><input type="number" id="newMatT" value="${existingMat&&existingMat.t_um!=null?existingMat.t_um:''}"></div>
+      <div class="input-group"><label class="input-label">초기총길이 (m)</label><input type="number" id="newMatL" value="${existingMat&&existingMat.L_total!=null?existingMat.L_total:''}"></div>
     </div>
     <div id="newMatCoreField" class="input-group">
       <label class="input-label">지관 크기</label>
@@ -1058,7 +1169,8 @@ function renderMaterialModal(){
     </div>
     <button class="btn btn-blue" id="saveMaterialBtn" style="width:100%; margin-top:6px;">저장</button>
   `;
-  let selType = 'roll', selCore = 103;
+  let selType = existingMat ? existingMat.type : 'roll';
+  let selCore = existingMat && existingMat.core_mm ? existingMat.core_mm : 103;
   function refreshTypeButtons(){
     $('newMatTypeRoll').className = 'btn ' + (selType==='roll'?'btn-blue':'btn-ghost');
     $('newMatTypeContainer').className = 'btn ' + (selType==='container'?'btn-blue':'btn-ghost');
@@ -1066,22 +1178,29 @@ function renderMaterialModal(){
     $('newMatRollFields').style.display = selType==='roll' ? 'grid' : 'none';
     $('newMatCoreField').style.display = selType==='roll' ? 'block' : 'none';
   }
+  function refreshCoreButtons(){
+    $('newMatCore103').className = selCore===103 ? 'btn btn-blue' : 'btn btn-ghost';
+    $('newMatCore182').className = selCore===182 ? 'btn btn-blue' : 'btn btn-ghost';
+  }
   $('newMatTypeRoll').onclick = ()=>{ selType='roll'; refreshTypeButtons(); };
   $('newMatTypeContainer').onclick = ()=>{ selType='container'; refreshTypeButtons(); };
   $('newMatTypeOther').onclick = ()=>{ selType='other'; refreshTypeButtons(); };
-  $('newMatCore103').onclick = ()=>{ selCore=103; $('newMatCore103').className='btn btn-blue'; $('newMatCore182').className='btn btn-ghost'; };
-  $('newMatCore182').onclick = ()=>{ selCore=182; $('newMatCore182').className='btn btn-blue'; $('newMatCore103').className='btn btn-ghost'; };
-  refreshTypeButtons();
+  $('newMatCore103').onclick = ()=>{ selCore=103; refreshCoreButtons(); };
+  $('newMatCore182').onclick = ()=>{ selCore=182; refreshCoreButtons(); };
+  refreshTypeButtons(); refreshCoreButtons();
   $('saveMaterialBtn').onclick = ()=>{
     const name = $('newMatName').value.trim();
     if(!name){ alert('자재명을 입력하세요.'); return; }
-    const entry = { id:uid('mat'), name, type:selType,
+    const entry = { name, type:selType,
       t_um: selType==='roll' ? (parseFloat($('newMatT').value)||null) : null,
       core_mm: selType==='roll' ? selCore : null,
       L_total: selType==='roll' ? (parseFloat($('newMatL').value)||null) : null };
-    const existing = state.materialLibrary.find(m=>m.name===name);
-    if(existing) Object.assign(existing, entry, {id:existing.id});
-    else state.materialLibrary.push(entry);
+    if(existingMat){ Object.assign(existingMat, entry); }
+    else{
+      const dup = state.materialLibrary.find(m=>m.name===name);
+      if(dup) Object.assign(dup, entry);
+      else state.materialLibrary.push(Object.assign({ id:uid('mat') }, entry));
+    }
     saveState(); renderAll(); closeModal('materialModal');
   };
 }
@@ -1089,18 +1208,24 @@ $('addMaterialBtn').addEventListener('click', ()=>{ renderMaterialModal(); openM
 
 // ---- 제품 프리셋 개별 등록 (자재 라이브러리에서 골라 구성) ----
 let presetSlotSelections = {};
-function renderPresetBuilderModal(){
+function renderPresetBuilderModal(editId){
   presetSlotSelections = {};
+  const existingPreset = editId ? state.presets.find(p=>p.id===editId) : null;
   const slotsHtml = ITEM_PRESETS.map((slot, idx)=>{
+    const existingMat = existingPreset ? existingPreset.materials.find(mt=>mt.position===slot.label) : null;
+    if(existingMat){
+      const libMatch = state.materialLibrary.find(m=>m.name===existingMat.materialName && m.type===slot.type);
+      if(libMatch) presetSlotSelections[idx] = { matId: libMatch.id };
+    }
     return `
       <div class="input-group">
         <label class="input-label">${slot.label} (${TYPE_KO[slot.type]})</label>
-        <input type="text" id="slotSearch_${idx}" placeholder="자재명 검색 또는 직접 입력" autocomplete="off" oninput="onSlotSearch(${idx})">
+        <input type="text" id="slotSearch_${idx}" placeholder="자재명 검색 또는 직접 입력" autocomplete="off" oninput="onSlotSearch(${idx})" value="${existingMat?existingMat.materialName:''}">
         <div class="autocomplete-list" id="slotResults_${idx}"></div>
       </div>`;
   }).join('');
   $('presetBuilderModalBody').innerHTML = `
-    <div class="input-group"><label class="input-label">제품명</label><input type="text" id="newPresetName" placeholder="예: 700G FOAM"></div>
+    <div class="input-group"><label class="input-label">제품명</label><input type="text" id="newPresetName" placeholder="예: 700G FOAM" value="${existingPreset?existingPreset.name:''}"></div>
     <div class="section-label">위치별 자재 선택</div>
     ${slotsHtml}
     <button class="btn btn-blue" id="savePresetBtn" style="width:100%; margin-top:8px;">저장</button>
@@ -1120,9 +1245,14 @@ function renderPresetBuilderModal(){
       }
     });
     if(!materials.length){ alert('최소 하나의 위치에 자재를 선택해주세요.'); return; }
-    const existing = state.presets.find(p=>p.name===name);
-    if(existing) existing.materials = materials;
-    else state.presets.push({ id:uid('preset'), name, materials });
+    if(existingPreset){
+      existingPreset.name = name;
+      existingPreset.materials = materials;
+    }else{
+      const dup = state.presets.find(p=>p.name===name);
+      if(dup) dup.materials = materials;
+      else state.presets.push({ id:uid('preset'), name, materials });
+    }
     saveState(); renderAll(); closeModal('presetBuilderModal');
     alert('제품 프리셋이 저장되었습니다.');
   };
@@ -1160,16 +1290,33 @@ document.addEventListener('input', (e)=>{
     const H = parseFloat($(`H_${iid}`).value);
     const LpreviewText = $(`LpreviewText_${iid}`);
     const HpreviewText = $(`HpreviewText_${iid}`);
+    const LapplyBtn = $(`LapplyBtn_${iid}`);
+    const HapplyBtn = $(`HapplyBtn_${iid}`);
     if(LpreviewText){
       const predH = H_fromLength(it.core_mm, t, L);
       LpreviewText.textContent = predH!=null ? `예상 쌓인두께: ${predH.toFixed(1)}mm` : '–';
+      if(LapplyBtn){ LapplyBtn.disabled = predH==null; LapplyBtn.dataset.value = predH!=null ? predH.toFixed(1) : ''; }
     }
     if(HpreviewText){
       const predL = rollRemainingM(it.core_mm, t, H);
       HpreviewText.textContent = predL!=null ? `예상 초기총길이: ${predL.toLocaleString(undefined,{maximumFractionDigits:1})}m` : '–';
+      if(HapplyBtn){ HapplyBtn.disabled = predL==null; HapplyBtn.dataset.value = predL!=null ? predL.toFixed(1) : ''; }
     }
   }
 });
+function applyLinkPreview(iid, target){
+  if(target==='H'){
+    const btn = $(`LapplyBtn_${iid}`);
+    if(!btn || !btn.dataset.value) return;
+    $(`H_${iid}`).value = btn.dataset.value;
+    $(`H_${iid}`).dispatchEvent(new Event('input', {bubbles:true}));
+  }else{
+    const btn = $(`HapplyBtn_${iid}`);
+    if(!btn || !btn.dataset.value) return;
+    $(`L_${iid}`).value = btn.dataset.value;
+    $(`L_${iid}`).dispatchEvent(new Event('input', {bubbles:true}));
+  }
+}
 function findMachineIdByItem_(iid){
   for(const m of state.machines){ for(const p of m.products){ if(p.items.some(i=>i.id===iid)) return m.id; } }
   return null;
@@ -1381,6 +1528,21 @@ document.addEventListener('click', (e)=>{
     const matId = btn.dataset.mat;
     if(confirm('이 자재를 라이브러리에서 삭제하시겠습니까? (이미 사용 중인 제품 프리셋에는 영향 없음)')){
       state.materialLibrary = state.materialLibrary.filter(m=>m.id!==matId);
+      saveState(); renderAll();
+    }
+  }
+  else if(act==='editmaterial'){
+    renderMaterialModal(btn.dataset.mat);
+    openModal('materialModal');
+  }
+  else if(act==='editpreset'){
+    renderPresetBuilderModal(btn.dataset.preset);
+    openModal('presetBuilderModal');
+  }
+  else if(act==='delpreset'){
+    const presetId = btn.dataset.preset;
+    if(confirm('이 제품 프리셋을 삭제하시겠습니까? (이미 생성된 제품에는 영향 없음)')){
+      state.presets = state.presets.filter(p=>p.id!==presetId);
       saveState(); renderAll();
     }
   }
