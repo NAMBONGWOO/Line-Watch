@@ -605,12 +605,12 @@ function machineHTML(m){
     </summary>
     <div class="machine-body">
       <div id="products_${m.id}">${m.products.filter(p=>p.active).map(p=>productHTML(m,p)).join('')}${m.products.filter(p=>!p.active).sort((a,b)=>(b.endedAt||0)-(a.endedAt||0)).map(p=>completedProductHTML(m,p)).join('')}</div>
-      <div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
-      <div class="card-footer-actions">
-        <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트코드: ${autoLotCode(m)||'미설정'}${m.lotCode?'':' (자동)'}</button>
-        <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">이름 수정</button>
-        <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">기계 삭제</button>
+      <div class="card-footer-actions" style="justify-content:flex-start;">
+        <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트 ${autoLotCode(m)||'미설정'}</button>
+        <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">수정</button>
+        <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">삭제</button>
       </div>
+      <div class="action-row-compact" style="margin-top:8px;"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
     </div>
   </details>`;
 }
@@ -672,16 +672,16 @@ function productHTML(m, p){
   </div>
   ${items.length>0 ? `<div class="section-label">원단롤</div><div class="item-grid">${items.map(itemButton).join('')}</div>` : ''}
   ${containers.length>0 ? `<div class="section-label">점착제통</div><div class="item-grid">${containers.map(itemButton).join('')}</div>` : ''}
+  <div class="action-row-compact"><button class="btn-compact" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 항목 추가</button></div>
   ${others.length>0 ? `<div class="section-label">기타</div><div class="item-grid">${others.map(itemButton).join('')}</div>` : ''}
-  <div class="action-row-compact">
-    <button class="btn-compact" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 항목 추가</button>
-    ${p.active ? `<button class="btn-compact" data-act="openlotmodal" data-m="${m.id}" data-p="${p.id}">📦 로트 완료</button>` : ''}
-  </div>
   <details class="completed-product">
     <summary><span>생산 이력</span><span class="completed-meta">${p.histories.length}건</span></summary>
     <div class="completed-body"><div class="history-list" id="hist_${p.id}"></div></div>
   </details>
-  ${p.active ? `<div class="action-row-compact" style="margin-top:10px;"><button class="btn-compact solid" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button></div>` : ''}
+  ${p.active ? `<div class="action-row-compact" style="margin-top:10px;">
+    <button class="btn-compact" data-act="openlotmodal" data-m="${m.id}" data-p="${p.id}">📦 로트 완료</button>
+    <button class="btn-compact solid" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button>
+  </div>` : ''}
   <div style="margin-top:10px;"></div>`;
 }
 
