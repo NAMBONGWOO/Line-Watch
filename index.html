@@ -16,7 +16,9 @@
     --warn:#d6483f; --amber:#e0a417; --ok:#3f8f5f;
   }
   *{box-sizing:border-box;}
+  html{ overscroll-behavior-y: none; }
   body{ margin:0; padding:18px 14px 84px; background:linear-gradient(180deg,#f7f9fb 0%, var(--bg) 220px);
+    overscroll-behavior-y: none;
     color:var(--text); font-family:'Segoe UI','Pretendard',-apple-system,sans-serif; max-width:480px; margin-left:auto; margin-right:auto; }
   .eyebrow{ font-size:.72rem; letter-spacing:.18em; color:var(--blue); text-transform:uppercase; font-weight:800; margin-bottom:4px; }
   h1{ font-size:1.4rem; margin:0; font-weight:800; letter-spacing:-.01em; color:var(--text); }
@@ -48,7 +50,9 @@
   .sum-action-btn{ padding:3px 9px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--text-dim); font-size:.66rem; font-weight:700; cursor:pointer; white-space:nowrap; flex-shrink:0; }
   .sum-action-btn.solid{ background:var(--warn); color:#fff; border-color:var(--warn); }
   .machine-summary-group{ margin-bottom:10px; }
-  .machine-summary-header{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:9px; background:linear-gradient(180deg,#f8fafc,#eef2f6); border:1px solid var(--line); cursor:pointer; font-weight:800; font-size:.82rem; }
+  .machine-summary-header{ padding:10px 12px; border-radius:9px; background:linear-gradient(180deg,#f8fafc,#eef2f6); border:1px solid var(--line); cursor:pointer; font-weight:800; font-size:.82rem; }
+  .ms-top-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .ms-product-row{ font-size:.74rem; font-weight:700; color:var(--blue); margin-top:3px; overflow-wrap:break-word; }
   .ms-badge{ font-size:.68rem; padding:2px 8px; border-radius:20px; font-weight:700; }
   .ms-badge.urgent{ background:#fce5e5; color:var(--warn); }
   .ms-badge.calm{ background:#e5f2ea; color:var(--ok); }
@@ -81,7 +85,7 @@
 
   .section-label{ font-size:.74rem; color:var(--text-dim); margin:10px 0 7px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
   .item-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-  .item-btn{ padding:12px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; }
+  .item-btn{ padding:10px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; }
   .item-btn.soon{ background:#fef8e6; border-color:var(--amber); }
   .item-btn.urgent{ background:#fce5e5; border-color:var(--warn); }
   .item-btn-name{ font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:4px; }
@@ -606,7 +610,7 @@ function machineHTML(m){
       <span class="arrow">▶</span>
     </summary>
     <div class="machine-body">
-      <div id="products_${m.id}">${m.products.filter(p=>p.active).map(p=>productHTML(m,p)).join('')}${m.products.filter(p=>!p.active).sort((a,b)=>(b.endedAt||0)-(a.endedAt||0)).map(p=>completedProductHTML(m,p)).join('')}</div>
+      <div id="products_${m.id}">${m.products.filter(p=>p.active).map(p=>productHTML(m,p)).join('')}</div>
       <div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
       <div class="card-footer-actions" style="justify-content:flex-start;">
         <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트 ${autoLotCode(m)||'미설정'}</button>
@@ -644,25 +648,8 @@ function productHTML(m, p){
   const refNow = nowFor(m);
 
   function itemButton(it){
-    let tier='ok', info='미계산';
-    if(it.type==='roll'){
-      if(it.rollTarget){
-        const diff = it.rollTarget-refNow;
-        tier = diff<10*60000?'urgent':(diff<30*60000?'soon':'ok');
-        info = fmtM(liveRemainM(it, refNow, p.speed)) + '<br>' + fmtCountdown(it.rollTarget, refNow, m.paused).text;
-      }
-    }else if(it.type==='container'){
-      if(it.target){
-        const diff = it.target-refNow;
-        tier = diff<10*60000?'urgent':(diff<30*60000?'soon':'ok');
-        info = fmtCountdown(it.target, refNow, m.paused).text;
-      }
-    }else{
-      tier='ok'; info = it.note ? it.note.slice(0,20) : '메모 없음';
-    }
-    return `<button class="item-btn ${tier}" data-act="openitem" data-m="${m.id}" data-p="${p.id}" data-i="${it.id}" style="border:none; padding:0; cursor:pointer;">
+    return `<button class="item-btn" data-act="openitem" data-m="${m.id}" data-p="${p.id}" data-i="${it.id}" style="border:none; padding:0; cursor:pointer;">
       <div class="item-btn-name">${it.label}</div>
-      <div class="item-btn-info">${info}</div>
     </button>`;
   }
 
@@ -828,7 +815,7 @@ function renderSummary(){
           itemGroups.push({ product, label, primary:subs[0], secondary:subs.slice(1) });
         }else if(it.type==='container'){
           if(!it.target) return;
-          itemGroups.push({ product, label, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false }, secondary:[] });
+          itemGroups.push({ product, label, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false, isContainer:true, pid:p.id, iid:it.id }, secondary:[] });
         }
       });
     });
@@ -850,7 +837,7 @@ function renderSummary(){
   }
   function actionBtnHTML(sub, mid){
     if(sub.isCp) return `<button class="sum-action-btn" data-act="quickdelcp" data-m="${mid}" data-p="${sub.pid}" data-i="${sub.iid}" data-cp="${sub.cpId}">✓</button>`;
-    if(sub.isRoll) return `<button class="sum-action-btn solid" data-act="openitemreplace" data-m="${mid}" data-p="${sub.pid}" data-i="${sub.iid}">교체</button>`;
+    if(sub.isRoll || sub.isContainer) return `<button class="sum-action-btn solid" data-act="openitemreplace" data-m="${mid}" data-p="${sub.pid}" data-i="${sub.iid}">교체</button>`;
     return '';
   }
 
@@ -897,11 +884,14 @@ function renderSummary(){
 
     return `<div class="machine-summary-group">
       <div class="machine-summary-header" data-act="togglesummarymachine" data-m="${m.id}">
-        <span>${m.no}${productNames.length?' · '+productNames.join(', '):''}</span>
-        <span style="display:flex; align-items:center; gap:6px;">
-          ${badge}
-          <span class="ms-arrow ${isOpen?'open':''}">▶</span>
-        </span>
+        <div class="ms-top-row">
+          <span>${m.no}</span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            ${badge}
+            <span class="ms-arrow ${isOpen?'open':''}">▶</span>
+          </span>
+        </div>
+        ${productNames.length ? `<div class="ms-product-row">${productNames.join(', ')}</div>` : ''}
       </div>
       <div class="machine-summary-body ${isOpen?'open':''}">${groupsHTML}</div>
     </div>`;
@@ -1050,7 +1040,7 @@ function renderItemModal(mid, pid, iid){
       </div>
       <button class="btn btn-ghost" data-act="calcrate" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">속도 계산해서 적용</button>
 
-      <div class="lot-box" style="background:#fef3e2;">
+      <div class="lot-box" style="background:#fef3e2;" id="replaceBox_${iid}">
         <div class="section-label" style="color:#b3820f;">🔄 자재 교체 (새 통)</div>
         <div class="row2">
           <div class="input-group"><label class="input-label">새 통 높이 (mm, 가득참)</label><input type="number" id="replaceContH_${iid}" placeholder=""></div>
