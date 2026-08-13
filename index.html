@@ -1417,14 +1417,14 @@ document.addEventListener('click', (e)=>{
     if(!(it.t_um>0) || !(it.core_mm>0)){ alert('원단 두께와 지관 크기를 먼저 확인해주세요.'); return; }
     // 교체 전, 이전 원단에서 실제로 사용한 길이 계산 (끝까지 썼든 잔량 남기고 교체했든)
     const prevLiveRemain = liveRemainM(it, Date.now(), prod.speed);
-    const usedAmount = (it.L_total!=null && prevLiveRemain!=null) ? Math.max(0, it.L_total - prevLiveRemain) : null;
+    const usedAmount = (it.L_total!=null && !isNaN(it.L_total) && prevLiveRemain!=null && !isNaN(prevLiveRemain)) ? Math.max(0, it.L_total - prevLiveRemain) : null;
     prod.histories.push({
       id:uid('h'), type:'replace', label:it.label, materialName:it.materialName,
       amount: usedAmount!=null ? usedAmount.toLocaleString(undefined,{maximumFractionDigits:1})+'m 사용' : '',
       matLot, note, time:Date.now()
     });
     it.L_total = len;
-    it.H = H_fromLength(it.core_mm, it.t_um, len);
+    it.H = Math.round(H_fromLength(it.core_mm, it.t_um, len) * 10) / 10;
     it.rollRemainM = len;
     it.rollTarget = (prod.speed>0) ? Date.now() + (len/prod.speed)*60000 : null;
     it.checkpoints = [];
@@ -1450,7 +1450,8 @@ document.addEventListener('click', (e)=>{
     const H = parseFloat($(`H_${iid}`).value);
     if(!(t_um>0) || !(H>=0)){ alert('값을 확인해주세요.'); return; }
     if(!(prod.speed>0)){ alert('제품의 생산속도가 설정되어 있지 않습니다. 제품 상세에서 먼저 설정해주세요.'); return; }
-    it.t_um=t_um; it.L_total=L_total; it.H=H;
+    it.t_um=t_um; it.H=H;
+    it.L_total = (L_total>0) ? L_total : null;
     const remainM = rollRemainingM(it.core_mm, t_um, H);
     it.rollRemainM=remainM;
     it.rollTarget = Date.now() + (remainM/prod.speed)*60000;
