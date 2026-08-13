@@ -40,14 +40,15 @@
   .sum-row.soon{ border-color:rgba(224,164,23,.5); background:rgba(224,164,23,.08); }
   .sum-row.paused{ opacity:.65; border-style:dashed; }
   .sum-left{ flex:1; min-width:0; }
-  .sum-left .name{ font-size:.9rem; font-weight:800; overflow-wrap:break-word; }
-  .sum-left .kind{ font-size:.74rem; color:var(--text-dim); margin-top:1px; }
+  .sum-product{ font-size:.68rem; color:var(--blue); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-bottom:1px; }
+  .sum-left .name{ font-size:.82rem; font-weight:800; overflow-wrap:break-word; }
+  .sum-left .kind{ font-size:.68rem; color:var(--text-dim); margin-top:1px; }
   .sum-sub{ font-size:.7rem; color:var(--text-dim); margin-top:3px; padding-left:8px; border-left:2px solid var(--line); flex:1; }
   .sum-sub-row{ display:flex; justify-content:space-between; align-items:center; gap:6px; }
   .sum-action-btn{ padding:3px 9px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--text-dim); font-size:.66rem; font-weight:700; cursor:pointer; white-space:nowrap; flex-shrink:0; }
   .sum-action-btn.solid{ background:var(--warn); color:#fff; border-color:var(--warn); }
   .machine-summary-group{ margin-bottom:10px; }
-  .machine-summary-header{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:9px; background:linear-gradient(180deg,#f8fafc,#eef2f6); border:1px solid var(--line); cursor:pointer; font-weight:800; font-size:.88rem; }
+  .machine-summary-header{ display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:9px; background:linear-gradient(180deg,#f8fafc,#eef2f6); border:1px solid var(--line); cursor:pointer; font-weight:800; font-size:.82rem; }
   .ms-badge{ font-size:.68rem; padding:2px 8px; border-radius:20px; font-weight:700; }
   .ms-badge.urgent{ background:#fce5e5; color:var(--warn); }
   .ms-badge.calm{ background:#e5f2ea; color:var(--ok); }
@@ -55,7 +56,8 @@
   .ms-arrow.open{ transform:rotate(90deg); }
   .machine-summary-body{ display:none; padding-top:7px; }
   .machine-summary-body.open{ display:block; }
-  .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:1.05rem; text-align:right; white-space:nowrap; flex-shrink:0; }
+  .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:.9rem; text-align:right; white-space:nowrap; flex-shrink:0; }
+  .sum-time-label{ font-size:.62rem; color:var(--text-dim); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
   .sum-time.urgent{ color:var(--warn); } .sum-time.soon{ color:#b3820f; } .sum-time.ok{ color:var(--ok); }
   .sum-time.paused{ color:var(--text-dim); font-size:.85rem; }
   .empty-msg{ color:var(--text-dim); font-size:.85rem; text-align:center; padding:10px 0; }
@@ -605,12 +607,12 @@ function machineHTML(m){
     </summary>
     <div class="machine-body">
       <div id="products_${m.id}">${m.products.filter(p=>p.active).map(p=>productHTML(m,p)).join('')}${m.products.filter(p=>!p.active).sort((a,b)=>(b.endedAt||0)-(a.endedAt||0)).map(p=>completedProductHTML(m,p)).join('')}</div>
+      <div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
       <div class="card-footer-actions" style="justify-content:flex-start;">
         <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트 ${autoLotCode(m)||'미설정'}</button>
         <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">수정</button>
         <button class="mini-btn mini-btn-warn" data-act="delmachine" data-m="${m.id}">삭제</button>
       </div>
-      <div class="action-row-compact" style="margin-top:8px;"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
     </div>
   </details>`;
 }
@@ -813,7 +815,7 @@ function renderSummary(){
     m.products.filter(p=>p.active).forEach(p=>{
       const refNow = nowFor(m);
       p.items.forEach(it=>{
-        const name = `${p.name} · ${it.label}`;
+        const product = p.name, label = it.label;
         if(it.type==='roll'){
           if(!it.rollTarget) return;
           const liveM = liveRemainM(it, refNow, p.speed);
@@ -823,10 +825,10 @@ function renderSummary(){
             subs.push({ target:cp.target, kind:cp.label, dist:liveD, invalid:cp.invalid, isCp:true, pid:p.id, iid:it.id, cpId:cp.id });
           });
           subs.sort((a,b)=>a.target-b.target);
-          itemGroups.push({ name, primary:subs[0], secondary:subs.slice(1) });
+          itemGroups.push({ product, label, primary:subs[0], secondary:subs.slice(1) });
         }else if(it.type==='container'){
           if(!it.target) return;
-          itemGroups.push({ name, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false }, secondary:[] });
+          itemGroups.push({ product, label, primary:{ target:it.target, kind:'약품 교체', dist:null, invalid:false }, secondary:[] });
         }
       });
     });
@@ -866,6 +868,7 @@ function renderSummary(){
     const badge = hasUrgent ? `<span class="ms-badge urgent">긴급 ${urgentCount}건</span>`
       : soonCount>0 ? `<span class="ms-badge urgent" style="background:#fef3e2; color:#b3820f;">곧 ${soonCount}건</span>`
       : `<span class="ms-badge calm">여유</span>`;
+    const productNames = [...new Set(itemGroups.map(g=>g.product))];
 
     const groupsHTML = itemGroups.map(g=>{
       const pt = timeOf(g.primary, refNow, m.paused);
@@ -879,8 +882,13 @@ function renderSummary(){
         </div>`;
       }).join('');
       return `<div class="sum-row ${tierClass}">
-        <div class="sum-left"><div class="name">${g.name}</div><div class="kind">${g.primary.kind}${distStr(g.primary.dist)}</div>${secondaryHTML}</div>
+        <div class="sum-left">
+          <div class="name">${g.label}</div>
+          <div class="kind">${g.primary.kind}${distStr(g.primary.dist)}</div>
+          ${secondaryHTML}
+        </div>
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+          <div class="sum-time-label">예정</div>
           <div class="sum-time ${pt.tier}">${pt.text}</div>
           ${primaryAction}
         </div>
@@ -889,7 +897,7 @@ function renderSummary(){
 
     return `<div class="machine-summary-group">
       <div class="machine-summary-header" data-act="togglesummarymachine" data-m="${m.id}">
-        <span>${m.no}</span>
+        <span>${m.no}${productNames.length?' · '+productNames.join(', '):''}</span>
         <span style="display:flex; align-items:center; gap:6px;">
           ${badge}
           <span class="ms-arrow ${isOpen?'open':''}">▶</span>
