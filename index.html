@@ -151,11 +151,21 @@
         <span class="auth-status on">✓ 입력 가능 모드</span>
         <button class="btn btn-ghost" id="logout-btn" style="width:auto; padding:8px 14px;">로그아웃</button>
       </div>
-      <button class="btn-add" id="uploadPresetBtn" style="margin:0;">📤 프리셋 엑셀 업로드</button>
+      <button class="btn-add" id="dailyCloseBtn" style="margin:0 0 12px; border-color:var(--amber); color:#b3820f;">🗓 일일 마감 (오늘 기록 스냅샷)</button>
+      <div class="section-label" style="margin-top:0;">등록</div>
+      <div class="row2" style="margin-bottom:8px;">
+        <button class="btn-add" id="addMaterialBtn" style="margin:0;">+ 자재 추가</button>
+        <button class="btn-add" id="addPresetBtn" style="margin:0;">+ 제품 추가</button>
+      </div>
+      <button class="btn-add" id="uploadPresetBtn" style="margin:0;">📤 대량 업로드 (엑셀/CSV)</button>
       <input type="file" id="presetFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
-      <button class="btn-add" id="dailyCloseBtn" style="margin:8px 0 0; border-color:var(--amber); color:#b3820f;">🗓 일일 마감 (오늘 기록 스냅샷)</button>
     </div>
   </div>
+
+  <details class="card" style="padding:0;">
+    <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">자재 라이브러리</summary>
+    <div style="padding:0 16px 16px;" id="materialLibraryList"><div class="empty-msg">등록된 자재 없음</div></div>
+  </details>
 
   <details class="card" style="padding:0;">
     <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">일일 마감 기록</summary>
@@ -188,6 +198,22 @@
         <button class="btn-add" id="customItemBtn" style="margin-top:4px;">+ 직접 입력</button>
         <button class="btn btn-ghost" style="width:100%;" onclick="closeModal('addItemModal')">취소</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 자재 추가 모달 -->
+  <div class="modal-overlay" id="materialModal">
+    <div class="modal">
+      <div class="modal-header"><span>자재 추가</span><button class="modal-close-x" onclick="closeModal('materialModal')">✕</button></div>
+      <div class="modal-body" id="materialModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 제품 프리셋 추가 모달 -->
+  <div class="modal-overlay" id="presetBuilderModal">
+    <div class="modal">
+      <div class="modal-header"><span>제품 프리셋 추가</span><button class="modal-close-x" onclick="closeModal('presetBuilderModal')">✕</button></div>
+      <div class="modal-body" id="presetBuilderModalBody"></div>
     </div>
   </div>
 
@@ -241,6 +267,11 @@ const ITEM_PRESETS = [
   { label:'점착제', type:'container' },
 ];
 const TYPE_KO = { roll:'원단롤', container:'점착제통', other:'기타' };
+function typeFromKo(label){
+  if(label==='점착제통') return 'container';
+  if(label==='기타') return 'other';
+  return 'roll';
+}
 
 function defaultItem(type, label, materialName){
   const base = { id:uid('it'), type, label, materialName: materialName||'' };
@@ -266,9 +297,10 @@ function itemFromPresetMaterial(mat){
 }
 
 function migrateState(s){
-  if(!s || !s.machines) return { machines:[], presets:[], dailyClosures:[] };
+  if(!s || !s.machines) return { machines:[], presets:[], dailyClosures:[], materialLibrary:[] };
   if(!s.presets) s.presets = [];
   if(!s.dailyClosures) s.dailyClosures = [];
+  if(!s.materialLibrary) s.materialLibrary = [];
   s.machines.forEach(m=>{
     if(!m.products){
       const legacyItems = m.items || [];
@@ -283,7 +315,7 @@ function migrateState(s){
   return s;
 }
 
-let state = { machines:[], presets:[], dailyClosures:[] };
+let state = { machines:[], presets:[], dailyClosures:[], materialLibrary:[] };
 let firestoreReady = false;
 
 (function loadLocalCache(){
@@ -359,8 +391,23 @@ $('presetFileInput').addEventListener('change', (e)=>{
         if(existing){ existing.materials = grouped[name]; updatedCount++; }
         else{ state.presets.push({ id:uid('preset'), name, materials:grouped[name] }); addedCount++; }
       });
+      let libAdded = 0, libUpdated = 0;
+      rows.forEach(row=>{
+        const mname = String(row['자재명']||'').trim();
+        if(!mname) return;
+        const type = typeFromKo(String(row['타입']||'').trim());
+        const entry = {
+          name: mname, type,
+          t_um: parseFloat(row['두께(µm)']) || null,
+          core_mm: parseFloat(row['지관크기(mm)']) || null,
+          L_total: parseFloat(row['초기총길이(m)']) || null,
+        };
+        const existingMat = state.materialLibrary.find(m=>m.name===mname);
+        if(existingMat){ Object.assign(existingMat, entry); libUpdated++; }
+        else{ state.materialLibrary.push(Object.assign({ id:uid('mat') }, entry)); libAdded++; }
+      });
       saveState();
-      alert(`프리셋 업로드 완료: 신규 ${addedCount}개, 갱신 ${updatedCount}개`);
+      alert(`프리셋 업로드 완료: 제품 신규 ${addedCount}개/갱신 ${updatedCount}개, 자재 라이브러리 신규 ${libAdded}개/갱신 ${libUpdated}개`);
       e.target.value = '';
     }catch(err){
       alert('업로드 실패: 파일 형식을 확인해주세요.\n'+err.message);
@@ -732,7 +779,7 @@ $('dailyCloseBtn').addEventListener('click', ()=>{
   saveState(); renderDailyClosures();
 });
 
-function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); }
+function renderAll(){ renderMachines(); renderHistories(); renderSummary(); renderDailyClosures(); renderMaterialLibrary(); }
 
 // ---- 항목 모달 ----
 function captureRollFieldsInProgress(it, iid){
@@ -872,6 +919,122 @@ function renderProductModalConfirm(mid, presetId){
     saveState(); renderAll(); closeModal('productModal');
   };
 }
+
+// ---- 자재 라이브러리 ----
+function renderMaterialLibrary(){
+  const el = $('materialLibraryList');
+  if(!el) return;
+  if(!state.materialLibrary.length){ el.innerHTML = '<div class="empty-msg">등록된 자재 없음</div>'; return; }
+  el.innerHTML = state.materialLibrary.map(mat=>`
+    <div class="history-item">
+      <div class="history-text"><strong>${mat.name}</strong> · ${TYPE_KO[mat.type]||mat.type}<br>${mat.type==='roll'?`두께 ${mat.t_um??'–'}µm · 지관 ${mat.core_mm??'–'}mm · ${mat.L_total??'–'}m`:''}</div>
+      <button class="history-btn" data-act="delmaterial" data-mat="${mat.id}">삭제</button>
+    </div>`).join('');
+}
+
+function renderMaterialModal(){
+  $('materialModalBody').innerHTML = `
+    <div class="input-group"><label class="input-label">자재명</label><input type="text" id="newMatName" placeholder="예: PET38단면 BOW 700"></div>
+    <div class="input-group">
+      <label class="input-label">타입</label>
+      <div class="row2" style="grid-template-columns:1fr 1fr 1fr; display:grid; gap:6px;">
+        <button class="btn btn-blue" id="newMatTypeRoll" style="padding:8px;">원단롤</button>
+        <button class="btn btn-ghost" id="newMatTypeContainer" style="padding:8px;">점착제통</button>
+        <button class="btn btn-ghost" id="newMatTypeOther" style="padding:8px;">기타</button>
+      </div>
+    </div>
+    <div id="newMatRollFields" class="row2">
+      <div class="input-group"><label class="input-label">두께 (µm)</label><input type="number" id="newMatT"></div>
+      <div class="input-group"><label class="input-label">초기총길이 (m)</label><input type="number" id="newMatL"></div>
+    </div>
+    <div id="newMatCoreField" class="input-group">
+      <label class="input-label">지관 크기</label>
+      <div class="row2">
+        <button class="btn btn-blue" id="newMatCore103" style="padding:8px;">103mm</button>
+        <button class="btn btn-ghost" id="newMatCore182" style="padding:8px;">182mm</button>
+      </div>
+    </div>
+    <button class="btn btn-blue" id="saveMaterialBtn" style="width:100%; margin-top:6px;">저장</button>
+  `;
+  let selType = 'roll', selCore = 103;
+  function refreshTypeButtons(){
+    $('newMatTypeRoll').className = 'btn ' + (selType==='roll'?'btn-blue':'btn-ghost');
+    $('newMatTypeContainer').className = 'btn ' + (selType==='container'?'btn-blue':'btn-ghost');
+    $('newMatTypeOther').className = 'btn ' + (selType==='other'?'btn-blue':'btn-ghost');
+    $('newMatRollFields').style.display = selType==='roll' ? 'grid' : 'none';
+    $('newMatCoreField').style.display = selType==='roll' ? 'block' : 'none';
+  }
+  $('newMatTypeRoll').onclick = ()=>{ selType='roll'; refreshTypeButtons(); };
+  $('newMatTypeContainer').onclick = ()=>{ selType='container'; refreshTypeButtons(); };
+  $('newMatTypeOther').onclick = ()=>{ selType='other'; refreshTypeButtons(); };
+  $('newMatCore103').onclick = ()=>{ selCore=103; $('newMatCore103').className='btn btn-blue'; $('newMatCore182').className='btn btn-ghost'; };
+  $('newMatCore182').onclick = ()=>{ selCore=182; $('newMatCore182').className='btn btn-blue'; $('newMatCore103').className='btn btn-ghost'; };
+  refreshTypeButtons();
+  $('saveMaterialBtn').onclick = ()=>{
+    const name = $('newMatName').value.trim();
+    if(!name){ alert('자재명을 입력하세요.'); return; }
+    const entry = { id:uid('mat'), name, type:selType,
+      t_um: selType==='roll' ? (parseFloat($('newMatT').value)||null) : null,
+      core_mm: selType==='roll' ? selCore : null,
+      L_total: selType==='roll' ? (parseFloat($('newMatL').value)||null) : null };
+    const existing = state.materialLibrary.find(m=>m.name===name);
+    if(existing) Object.assign(existing, entry, {id:existing.id});
+    else state.materialLibrary.push(entry);
+    saveState(); renderAll(); closeModal('materialModal');
+  };
+}
+$('addMaterialBtn').addEventListener('click', ()=>{ renderMaterialModal(); openModal('materialModal'); });
+
+// ---- 제품 프리셋 개별 등록 (자재 라이브러리에서 골라 구성) ----
+function renderPresetBuilderModal(){
+  const slotsHtml = ITEM_PRESETS.map((slot, idx)=>{
+    const candidates = state.materialLibrary.filter(m=>m.type===slot.type);
+    const options = ['<option value="">(선택 안함)</option>']
+      .concat(candidates.map(m=>`<option value="${m.id}">${m.name}</option>`))
+      .concat(['<option value="__custom__">(직접 입력...)</option>']).join('');
+    return `
+      <div class="input-group">
+        <label class="input-label">${slot.label} (${TYPE_KO[slot.type]})</label>
+        <select id="slotSel_${idx}" onchange="onPresetSlotChange(${idx})">${options}</select>
+        <input type="text" id="slotCustom_${idx}" placeholder="자재명 직접 입력" style="display:none; margin-top:6px;">
+      </div>`;
+  }).join('');
+  $('presetBuilderModalBody').innerHTML = `
+    <div class="input-group"><label class="input-label">제품명</label><input type="text" id="newPresetName" placeholder="예: 700G FOAM"></div>
+    <div class="section-label">위치별 자재 선택</div>
+    ${slotsHtml}
+    <button class="btn btn-blue" id="savePresetBtn" style="width:100%; margin-top:8px;">저장</button>
+  `;
+  $('savePresetBtn').onclick = ()=>{
+    const name = $('newPresetName').value.trim();
+    if(!name){ alert('제품명을 입력하세요.'); return; }
+    const materials = [];
+    ITEM_PRESETS.forEach((slot, idx)=>{
+      const sel = $(`slotSel_${idx}`).value;
+      if(!sel) return;
+      if(sel==='__custom__'){
+        const cname = $(`slotCustom_${idx}`).value.trim();
+        if(!cname) return;
+        materials.push({ position:slot.label, materialName:cname, type:TYPE_KO[slot.type], t_um:null, core_mm:slot.type==='roll'?103:null, L_total:null });
+      }else{
+        const mat = state.materialLibrary.find(m=>m.id===sel);
+        if(!mat) return;
+        materials.push({ position:slot.label, materialName:mat.name, type:TYPE_KO[mat.type], t_um:mat.t_um, core_mm:mat.core_mm, L_total:mat.L_total });
+      }
+    });
+    if(!materials.length){ alert('최소 하나의 위치에 자재를 선택해주세요.'); return; }
+    const existing = state.presets.find(p=>p.name===name);
+    if(existing) existing.materials = materials;
+    else state.presets.push({ id:uid('preset'), name, materials });
+    saveState(); renderAll(); closeModal('presetBuilderModal');
+    alert('제품 프리셋이 저장되었습니다.');
+  };
+}
+function onPresetSlotChange(idx){
+  const sel = $(`slotSel_${idx}`).value;
+  $(`slotCustom_${idx}`).style.display = sel==='__custom__' ? 'block' : 'none';
+}
+$('addPresetBtn').addEventListener('click', ()=>{ renderPresetBuilderModal(); openModal('presetBuilderModal'); });
 
 // ---- 클릭 위임 ----
 document.addEventListener('input', (e)=>{
@@ -1100,6 +1263,13 @@ document.addEventListener('click', (e)=>{
     if(confirm('이 이력을 삭제하시겠습니까?')){
       const p = findProduct(mid, pid);
       p.histories = p.histories.filter(h=>h.id!==hid);
+      saveState(); renderAll();
+    }
+  }
+  else if(act==='delmaterial'){
+    const matId = btn.dataset.mat;
+    if(confirm('이 자재를 라이브러리에서 삭제하시겠습니까? (이미 사용 중인 제품 프리셋에는 영향 없음)')){
+      state.materialLibrary = state.materialLibrary.filter(m=>m.id!==matId);
       saveState(); renderAll();
     }
   }
