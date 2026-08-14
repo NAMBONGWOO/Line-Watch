@@ -610,8 +610,10 @@ function machineHTML(m){
       <span class="arrow">▶</span>
     </summary>
     <div class="machine-body">
-      <div id="products_${m.id}">${m.products.filter(p=>p.active).map(p=>productHTML(m,p)).join('')}</div>
-      <div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">+ 신규 제품</button></div>
+      <div id="products_${m.id}">${(()=>{
+        const activeList = m.products.filter(p=>p.active);
+        return activeList.map((p,idx)=>productHTML(m,p, idx===activeList.length-1)).join('') || `<div class="action-row-compact"><button class="btn-compact" data-act="addproduct" data-m="${m.id}">신규제품</button></div>`;
+      })()}</div>
       <div class="card-footer-actions" style="justify-content:flex-start;">
         <button class="mini-btn" data-act="setlotcode" data-m="${m.id}">로트 ${autoLotCode(m)||'미설정'}</button>
         <button class="mini-btn" data-act="renamemachine" data-m="${m.id}">수정</button>
@@ -641,10 +643,7 @@ function completedProductHTML(m, p){
   </details>`;
 }
 
-function productHTML(m, p){
-  const items = p.items.filter(i=>i.type==='roll');
-  const containers = p.items.filter(i=>i.type==='container');
-  const others = p.items.filter(i=>i.type==='other');
+function productHTML(m, p, showAddProduct){
   const refNow = nowFor(m);
 
   function itemButton(it){
@@ -654,22 +653,23 @@ function productHTML(m, p){
   }
 
   return `
-  <div class="product-header">
-    <div class="product-title">${p.name}${p.active?'':' (종료)'}</div>
-    <div class="product-status">${p.items.length}개 항목</div>
-    ${p.targetQty ? `<div class="product-progress">${progressText(p)}</div>` : ''}
+  <div class="product-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+    <div>
+      <div class="product-title">${p.name}${p.active?'':' (종료)'}</div>
+      <div class="product-status">${p.items.length}개 항목</div>
+      ${p.targetQty ? `<div class="product-progress">${progressText(p)}</div>` : ''}
+    </div>
+    <button class="btn-compact" style="flex-shrink:0;" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 자재 추가</button>
   </div>
-  ${items.length>0 ? `<div class="section-label">원단롤</div><div class="item-grid">${items.map(itemButton).join('')}</div>` : ''}
-  ${containers.length>0 ? `<div class="section-label">점착제통</div><div class="item-grid">${containers.map(itemButton).join('')}</div>` : ''}
-  <div class="action-row-compact"><button class="btn-compact" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 항목 추가</button></div>
-  ${others.length>0 ? `<div class="section-label">기타</div><div class="item-grid">${others.map(itemButton).join('')}</div>` : ''}
+  ${p.items.length>0 ? `<div class="item-grid">${p.items.map(itemButton).join('')}</div>` : ''}
   <details class="completed-product">
     <summary><span>생산 이력</span><span class="completed-meta">${p.histories.length}건</span></summary>
     <div class="completed-body"><div class="history-list" id="hist_${p.id}"></div></div>
   </details>
   ${p.active ? `<div class="action-row-compact" style="margin-top:10px;">
-    <button class="btn-compact" data-act="openlotmodal" data-m="${m.id}" data-p="${p.id}">📦 로트 완료</button>
-    <button class="btn-compact solid" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">✓ 생산 완료</button>
+    <button class="btn-compact" data-act="openlotmodal" data-m="${m.id}" data-p="${p.id}">로트완료</button>
+    <button class="btn-compact solid" data-act="endproduct" data-m="${m.id}" data-p="${p.id}">생산완료</button>
+    ${showAddProduct ? `<button class="btn-compact" data-act="addproduct" data-m="${m.id}">신규제품</button>` : ''}
   </div>` : ''}
   <div style="margin-top:10px;"></div>`;
 }
