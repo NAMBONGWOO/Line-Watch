@@ -17,7 +17,7 @@
   }
   *{box-sizing:border-box;}
   html{ overscroll-behavior-y: none; }
-  body{ margin:0; padding:18px 14px 84px; background:linear-gradient(180deg,#f7f9fb 0%, var(--bg) 220px);
+  body{ margin:0; padding:10px 10px 84px; background:linear-gradient(180deg,#f7f9fb 0%, var(--bg) 220px);
     overscroll-behavior-y: none;
     color:var(--text); font-family:'Segoe UI','Pretendard',-apple-system,sans-serif; max-width:480px; margin-left:auto; margin-right:auto; }
   .eyebrow{ font-size:.72rem; letter-spacing:.18em; color:var(--blue); text-transform:uppercase; font-weight:800; margin-bottom:4px; }
@@ -31,13 +31,13 @@
   .ac-item:last-child{ border-bottom:0; }
   .ac-item.ac-empty{ color:var(--text-dim); cursor:default; }
 
-  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(30,50,80,.06); }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 1px 3px rgba(30,50,80,.06); }
   .card h2{ font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); margin:0 0 12px; font-weight:800; }
   .card input{ padding:10px; border:1px solid var(--line); border-radius:8px; }
   .auth-status{ font-size:.8rem; color:var(--text-dim); font-weight:700; }
   .auth-status.on{ color:var(--ok); }
 
-  .sum-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:11px 12px; border-radius:9px; margin-bottom:7px; background:var(--card2); border:1px solid var(--line); }
+  .sum-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:6px; padding:8px; border-radius:8px; margin-bottom:6px; background:var(--card2); border:1px solid var(--line); }
   .sum-row.urgent{ border-color:rgba(214,72,63,.5); background:rgba(214,72,63,.07); }
   .sum-row.soon{ border-color:rgba(224,164,23,.5); background:rgba(224,164,23,.08); }
   .sum-row.paused{ opacity:.65; border-style:dashed; }
@@ -60,7 +60,7 @@
   .ms-arrow.open{ transform:rotate(90deg); }
   .machine-summary-body{ display:none; padding-top:7px; }
   .machine-summary-body.open{ display:block; }
-  .sum-time{ font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-weight:800; font-size:.9rem; text-align:right; white-space:nowrap; flex-shrink:0; }
+  .sum-time{ font-weight:800; font-size:.8rem; text-align:right; white-space:nowrap; flex-shrink:0; letter-spacing:-.01em; }
   .sum-time-label{ font-size:.62rem; color:var(--text-dim); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
   .sum-time.urgent{ color:var(--warn); } .sum-time.soon{ color:#b3820f; } .sum-time.ok{ color:var(--ok); }
   .sum-time.paused{ color:var(--text-dim); font-size:.85rem; }
@@ -76,7 +76,7 @@
   .pause-badge{ font-size:.68rem; font-weight:700; color:#8a6d1a; background:#fbeecb; border:1px solid #f0d998; border-radius:20px; padding:2px 8px; white-space:nowrap; }
   .arrow{ color:var(--text-dim); font-size:.8rem; transition:transform .15s; margin-left:8px; flex-shrink:0; }
   details.machine[open] > summary .arrow{ transform:rotate(90deg); }
-  .machine-body{ padding:12px 14px 14px; background:var(--card); }
+  .machine-body{ padding:8px 10px 10px; background:var(--card); }
 
   .product-header{ padding:10px 12px; background:#f9fafb; border-radius:8px; margin-bottom:12px; border:1px solid var(--line); }
   .product-title{ font-weight:800; font-size:.95rem; margin-bottom:2px; }
@@ -85,7 +85,7 @@
 
   .section-label{ font-size:.74rem; color:var(--text-dim); margin:10px 0 7px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
   .item-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-  .item-btn{ padding:10px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; }
+  .item-btn{ padding:8px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; }
   .item-btn.soon{ background:#fef8e6; border-color:var(--amber); }
   .item-btn.urgent{ background:#fce5e5; border-color:var(--warn); }
   .item-btn-name{ font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:4px; }
@@ -93,12 +93,12 @@
   .item-btn.urgent .item-btn-info{ color:var(--warn); font-weight:600; }
   .item-btn.soon .item-btn-info{ color:#b3820f; font-weight:600; }
 
-  .btn-add{ background:transparent; color:var(--blue); border:1.5px dashed var(--blue); border-radius:10px; padding:11px; width:100%; font-weight:800; cursor:pointer; font-size:.86rem; margin-bottom:10px;}
-  .btn{ padding:10px; border:0; border-radius:8px; font-weight:800; cursor:pointer; font-size:.84rem; }
+  .btn-add{ background:transparent; color:var(--blue); border:1.5px dashed var(--blue); border-radius:9px; padding:8px; width:100%; font-weight:800; cursor:pointer; font-size:.82rem; margin-bottom:8px;}
+  .btn{ padding:8px; border:0; border-radius:8px; font-weight:800; cursor:pointer; font-size:.82rem; }
   .btn-blue{ background:linear-gradient(180deg,var(--blue-bright),var(--blue)); color:#fff; width:100%; }
   .btn-ghost{ background:#fff; color:var(--text-dim); border:1px solid var(--line); }
   .card-footer-actions{ display:flex; gap:8px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); justify-content:flex-end; flex-wrap:wrap; }
-  .mini-btn{ padding:7px 12px; border-radius:7px; border:1px solid var(--line); background:#fff; color:var(--text-dim); font-size:.74rem; font-weight:700; cursor:pointer; }
+  .mini-btn{ padding:5px 9px; border-radius:7px; border:1px solid var(--line); background:#fff; color:var(--text-dim); font-size:.72rem; font-weight:700; cursor:pointer; }
   .mini-btn-warn{ color:var(--warn); border-color:rgba(214,72,63,.35); }
 
   .modal-overlay{ display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:100; align-items:center; justify-content:center; }
@@ -120,7 +120,7 @@
   .lot-box{ background:#e5edf9; border-radius:10px; padding:12px; margin-top:14px; }
   .lot-box .section-label{ color:var(--blue); margin-top:0; }
   .action-row-compact{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-  .btn-compact{ padding:9px 16px; border-radius:8px; font-weight:800; font-size:.8rem; cursor:pointer; border:1.5px dashed var(--blue); background:transparent; color:var(--blue); white-space:nowrap; }
+  .btn-compact{ padding:7px 11px; border-radius:8px; font-weight:800; font-size:.78rem; cursor:pointer; border:1.5px dashed var(--blue); background:transparent; color:var(--blue); white-space:nowrap; }
   .btn-compact.solid{ border-style:solid; border-color:var(--blue); background:linear-gradient(180deg,var(--blue-bright),var(--blue)); color:#fff; }
   .modal-buttons{ display:flex; gap:8px; margin-top:12px; }
   .modal-buttons .btn{ flex:1; padding:10px; }
@@ -659,7 +659,7 @@ function productHTML(m, p, showAddProduct){
       <div class="product-status">${p.items.length}개 항목</div>
       ${p.targetQty ? `<div class="product-progress">${progressText(p)}</div>` : ''}
     </div>
-    <button class="btn-compact" style="flex-shrink:0;" data-act="additem" data-m="${m.id}" data-p="${p.id}">+ 자재 추가</button>
+    <button class="btn-compact" style="flex-shrink:0;" data-act="additem" data-m="${m.id}" data-p="${p.id}">+자재</button>
   </div>
   ${p.items.length>0 ? `<div class="item-grid">${p.items.map(itemButton).join('')}</div>` : ''}
   <details class="completed-product">
