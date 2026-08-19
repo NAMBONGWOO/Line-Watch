@@ -1150,12 +1150,13 @@ function renderPresetLibrary(){
     </div>`).join('');
 }
 
-function renderMaterialModal(editId){
+function renderMaterialModal(editId, templateData){
   const existingMat = editId ? state.materialLibrary.find(m=>m.id===editId) : null;
+  const seed = existingMat || templateData || null;
   $('materialModalBody').innerHTML = `
     <div class="input-group">
       <label class="input-label">자재명</label>
-      <input type="text" id="newMatName" placeholder="예: PET38단면 BOW 700" value="${existingMat?existingMat.name:''}" autocomplete="off" oninput="onNewMatNameSearch()">
+      <input type="text" id="newMatName" placeholder="예: PET38단면 BOW 700" value="${seed?seed.name:''}" autocomplete="off" oninput="onNewMatNameSearch()">
       <div class="autocomplete-list" id="newMatNameResults"></div>
     </div>
     <div class="input-group">
@@ -1167,8 +1168,8 @@ function renderMaterialModal(editId){
       </div>
     </div>
     <div id="newMatRollFields" class="row2">
-      <div class="input-group"><label class="input-label">두께 (µm)</label><input type="number" id="newMatT" value="${existingMat&&existingMat.t_um!=null?existingMat.t_um:''}"></div>
-      <div class="input-group"><label class="input-label">초기총길이 (m)</label><input type="number" id="newMatL" value="${existingMat&&existingMat.L_total!=null?existingMat.L_total:''}"></div>
+      <div class="input-group"><label class="input-label">두께 (µm)</label><input type="number" id="newMatT" value="${seed&&seed.t_um!=null?seed.t_um:''}"></div>
+      <div class="input-group"><label class="input-label">초기총길이 (m)</label><input type="number" id="newMatL" value="${seed&&seed.L_total!=null?seed.L_total:''}"></div>
     </div>
     <div id="newMatCoreField" class="input-group">
       <label class="input-label">지관 크기</label>
@@ -1177,10 +1178,11 @@ function renderMaterialModal(editId){
         <button class="btn btn-ghost" id="newMatCore182" style="padding:8px;">182mm</button>
       </div>
     </div>
+    ${templateData && !existingMat ? `<div class="btn-hint" style="text-align:left; color:var(--blue);">"${templateData.name}" 값을 참고해서 채웠습니다 — 이름을 바꾸면 새 자재로 저장됩니다</div>` : ''}
     <button class="btn btn-blue" id="saveMaterialBtn" style="width:100%; margin-top:6px;">저장</button>
   `;
-  let selType = existingMat ? existingMat.type : 'roll';
-  let selCore = existingMat && existingMat.core_mm ? existingMat.core_mm : 103;
+  let selType = seed ? seed.type : 'roll';
+  let selCore = seed && seed.core_mm ? seed.core_mm : 103;
   function refreshTypeButtons(){
     $('newMatTypeRoll').className = 'btn ' + (selType==='roll'?'btn-blue':'btn-ghost');
     $('newMatTypeContainer').className = 'btn ' + (selType==='container'?'btn-blue':'btn-ghost');
@@ -1222,34 +1224,39 @@ function onNewMatNameSearch(){
   if(!q){ results.innerHTML=''; return; }
   const candidates = state.materialLibrary.filter(m=>m.name.toLowerCase().includes(q)).slice(0,6);
   results.innerHTML = candidates.length
-    ? candidates.map(m=>`<div class="ac-item" onclick="renderMaterialModal('${m.id}')">${m.name} <span style="color:var(--text-dim);">(${TYPE_KO[m.type]||m.type} · 이미 등록됨)</span></div>`).join('')
+    ? candidates.map(m=>`<div class="ac-item" style="display:flex; justify-content:space-between; align-items:center;">
+        <span onclick='renderMaterialModal(null, ${JSON.stringify(m)})' style="flex:1; cursor:pointer;">${m.name} <span style="color:var(--text-dim);">(${TYPE_KO[m.type]||m.type})</span></span>
+        <button type="button" class="history-btn" onclick="renderMaterialModal('${m.id}')" style="flex-shrink:0;">이 자재 수정</button>
+      </div>`).join('')
     : '<div class="ac-item ac-empty">일치하는 자재 없음 (새 자재로 등록됨)</div>';
 }
 
 // ---- 제품 프리셋 개별 등록 (자재 라이브러리에서 골라 구성) ----
 let presetSlotSelections = {};
-function renderPresetBuilderModal(editId){
+function renderPresetBuilderModal(editId, templateData){
   presetSlotSelections = {};
   const existingPreset = editId ? state.presets.find(p=>p.id===editId) : null;
+  const seedPreset = existingPreset || templateData || null;
   const slotsHtml = ITEM_PRESETS.map((slot, idx)=>{
-    const existingMat = existingPreset ? existingPreset.materials.find(mt=>mt.position===slot.label) : null;
-    if(existingMat){
-      const libMatch = state.materialLibrary.find(m=>m.name===existingMat.materialName && m.type===slot.type);
+    const seedMat = seedPreset ? seedPreset.materials.find(mt=>mt.position===slot.label) : null;
+    if(seedMat){
+      const libMatch = state.materialLibrary.find(m=>m.name===seedMat.materialName && m.type===slot.type);
       if(libMatch) presetSlotSelections[idx] = { matId: libMatch.id };
     }
     return `
       <div class="input-group">
         <label class="input-label">${slot.label} (${TYPE_KO[slot.type]})</label>
-        <input type="text" id="slotSearch_${idx}" placeholder="자재명 검색 또는 직접 입력" autocomplete="off" oninput="onSlotSearch(${idx})" value="${existingMat?existingMat.materialName:''}">
+        <input type="text" id="slotSearch_${idx}" placeholder="자재명 검색 또는 직접 입력" autocomplete="off" oninput="onSlotSearch(${idx})" value="${seedMat?seedMat.materialName:''}">
         <div class="autocomplete-list" id="slotResults_${idx}"></div>
       </div>`;
   }).join('');
   $('presetBuilderModalBody').innerHTML = `
     <div class="input-group">
       <label class="input-label">제품명</label>
-      <input type="text" id="newPresetName" placeholder="예: 700G FOAM" value="${existingPreset?existingPreset.name:''}" autocomplete="off" oninput="onNewPresetNameSearch()">
+      <input type="text" id="newPresetName" placeholder="예: 700G FOAM" value="${seedPreset?seedPreset.name:''}" autocomplete="off" oninput="onNewPresetNameSearch()">
       <div class="autocomplete-list" id="newPresetNameResults"></div>
     </div>
+    ${templateData && !existingPreset ? `<div class="btn-hint" style="text-align:left; color:var(--blue);">"${templateData.name}" 구성을 참고해서 채웠습니다 — 이름을 바꾸면 새 프리셋으로 저장됩니다</div>` : ''}
     <div class="section-label">위치별 자재 선택</div>
     ${slotsHtml}
     <button class="btn btn-blue" id="savePresetBtn" style="width:100%; margin-top:8px;">저장</button>
@@ -1307,7 +1314,10 @@ function onNewPresetNameSearch(){
   if(!q){ results.innerHTML=''; return; }
   const candidates = state.presets.filter(p=>p.name.toLowerCase().includes(q)).slice(0,6);
   results.innerHTML = candidates.length
-    ? candidates.map(p=>`<div class="ac-item" onclick="renderPresetBuilderModal('${p.id}')">${p.name} <span style="color:var(--text-dim);">(이미 등록됨)</span></div>`).join('')
+    ? candidates.map(p=>`<div class="ac-item" style="display:flex; justify-content:space-between; align-items:center;">
+        <span onclick='renderPresetBuilderModal(null, ${JSON.stringify(p)})' style="flex:1; cursor:pointer;">${p.name}</span>
+        <button type="button" class="history-btn" onclick="renderPresetBuilderModal('${p.id}')" style="flex-shrink:0;">이 프리셋 수정</button>
+      </div>`).join('')
     : '<div class="ac-item ac-empty">일치하는 프리셋 없음 (새 프리셋으로 등록됨)</div>';
 }
 
