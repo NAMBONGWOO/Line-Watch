@@ -208,7 +208,15 @@
 
     <details class="card" style="padding:0;">
       <summary style="padding:16px; cursor:pointer; list-style:none; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800;">자재 라이브러리</summary>
-      <div style="padding:0 16px 16px;" id="materialLibraryList"><div class="empty-msg">등록된 자재 없음</div></div>
+      <div style="padding:0 16px 16px;">
+        <div class="action-row-compact" id="matLibFilterRow" style="margin-bottom:8px;">
+          <button class="btn-compact solid" data-filter="" onclick="setMatLibFilter('')">전체</button>
+          <button class="btn-compact" data-filter="roll" onclick="setMatLibFilter('roll')">원단롤</button>
+          <button class="btn-compact" data-filter="container" onclick="setMatLibFilter('container')">점착제통</button>
+          <button class="btn-compact" data-filter="other" onclick="setMatLibFilter('other')">기타</button>
+        </div>
+        <div id="materialLibraryList"><div class="empty-msg">등록된 자재 없음</div></div>
+      </div>
     </details>
 
     <details class="card" style="padding:0;">
@@ -1122,11 +1130,20 @@ function renderProductModalConfirm(mid, presetId){
 }
 
 // ---- 자재 라이브러리 ----
+let matLibFilter = '';
+function setMatLibFilter(type){
+  matLibFilter = type;
+  document.querySelectorAll('#matLibFilterRow .btn-compact').forEach(b=>{
+    b.className = 'btn-compact' + (b.dataset.filter===type ? ' solid' : '');
+  });
+  renderMaterialLibrary();
+}
 function renderMaterialLibrary(){
   const el = $('materialLibraryList');
   if(!el) return;
-  if(!state.materialLibrary.length){ el.innerHTML = '<div class="empty-msg">등록된 자재 없음</div>'; return; }
-  el.innerHTML = state.materialLibrary.map(mat=>`
+  const list = matLibFilter ? state.materialLibrary.filter(m=>m.type===matLibFilter) : state.materialLibrary;
+  if(!list.length){ el.innerHTML = `<div class="empty-msg">${matLibFilter ? '해당 타입의 자재 없음' : '등록된 자재 없음'}</div>`; return; }
+  el.innerHTML = list.map(mat=>`
     <div class="history-item">
       <div class="history-text"><strong>${mat.name}</strong> · ${TYPE_KO[mat.type]||mat.type}<br>${mat.type==='roll'?`두께 ${mat.t_um??'–'}µm · 지관 ${mat.core_mm??'–'}mm · ${mat.L_total??'–'}m`:''}</div>
       <div class="history-actions">
