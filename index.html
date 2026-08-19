@@ -974,10 +974,12 @@ function renderItemModal(mid, pid, iid){
   if(it.type==='roll'){
     const cpListHtml = renderCpListInModal(it, mid, pid);
     modalBody = `
-      <div class="row2">
-        <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
-        <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}" data-act="linkpreview" data-i="${iid}"></div>
+      <div class="input-group">
+        <label class="input-label">자재명</label>
+        <input type="text" id="mat_${iid}" value="${it.materialName||''}" autocomplete="off" oninput="onMatSearch('${iid}','roll')">
+        <div class="autocomplete-list" id="matResults_${iid}"></div>
       </div>
+      <div class="input-group"><label class="input-label">원단 두께 (µm)</label><input type="number" id="t_${iid}" value="${it.t_um??''}" data-act="linkpreview" data-i="${iid}"></div>
       <div class="row2">
         <div class="input-group">
           <label class="input-label">초기 총 길이 (m)</label>
@@ -1022,13 +1024,15 @@ function renderItemModal(mid, pid, iid){
     `;
   }else if(it.type==='container'){
     modalBody = `
-      <div class="row2">
-        <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
-        <div class="input-group"><label class="input-label">교체 기준 높이 (mm)</label><input type="number" id="minH_${iid}" value="${it.minH??''}"></div>
+      <div class="input-group">
+        <label class="input-label">자재명</label>
+        <input type="text" id="mat_${iid}" value="${it.materialName||''}" autocomplete="off" oninput="onMatSearch('${iid}','container')">
+        <div class="autocomplete-list" id="matResults_${iid}"></div>
       </div>
-      <div class="row2">
+      <div class="row3">
         <div class="input-group"><label class="input-label">현재 높이 (mm)</label><input type="number" id="curH_${iid}" value="${it.curH??''}"></div>
-        <div class="input-group"><label class="input-label">소모속도 (mm/시간)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
+        <div class="input-group"><label class="input-label">소모속도 (mm/h)</label><input type="number" id="rate_${iid}" value="${it.rate??''}"></div>
+        <div class="input-group"><label class="input-label">교체 기준(mm)</label><input type="number" id="minH_${iid}" value="${it.minH??''}"></div>
       </div>
       <button class="btn btn-blue" data-act="calccontainer" data-m="${mid}" data-p="${pid}" data-i="${iid}">계산 업데이트</button>
       ${it.target ? `<div class="result-box">예상 교체까지<br>약 ${Math.floor((it.target-refNow)/3600000)}시간</div>` : ''}
@@ -1052,7 +1056,11 @@ function renderItemModal(mid, pid, iid){
     `;
   }else{
     modalBody = `
-      <div class="input-group"><label class="input-label">자재명</label><input type="text" id="mat_${iid}" value="${it.materialName||''}"></div>
+      <div class="input-group">
+        <label class="input-label">자재명</label>
+        <input type="text" id="mat_${iid}" value="${it.materialName||''}" autocomplete="off" oninput="onMatSearch('${iid}','other')">
+        <div class="autocomplete-list" id="matResults_${iid}"></div>
+      </div>
       <div class="input-group"><label class="input-label">메모 / 상태</label><input type="text" id="note_${iid}" value="${it.note||''}"></div>
       <button class="btn btn-blue" data-act="savenote" data-m="${mid}" data-p="${pid}" data-i="${iid}">저장</button>
     `;
@@ -1274,6 +1282,40 @@ function pickSlotMaterial(idx, matId){
   $(`slotResults_${idx}`).innerHTML = '';
 }
 $('addPresetBtn').addEventListener('click', ()=>{ renderPresetBuilderModal(); openModal('presetBuilderModal'); });
+
+// ---- 항목 상세의 자재명 필드 자동완성 (자재 라이브러리 미리보기) ----
+function onMatSearch(iid, type){
+  const q = $(`mat_${iid}`).value.trim().toLowerCase();
+  const results = $(`matResults_${iid}`);
+  if(!results) return;
+  if(!q){ results.innerHTML=''; return; }
+  const candidates = state.materialLibrary.filter(m=>m.type===type && m.name.toLowerCase().includes(q)).slice(0,6);
+  results.innerHTML = candidates.length
+    ? candidates.map(m=>`<div class="ac-item" onclick="pickMatForItem('${iid}','${m.id}')">${m.name}${m.type==='roll'?` <span style="color:var(--text-dim);">(두께 ${m.t_um??'–'}µm · 지관 ${m.core_mm??'–'}mm)</span>`:''}</div>`).join('')
+    : '<div class="ac-item ac-empty">일치하는 자재 없음 (그대로 입력하면 새 이름으로 저장)</div>';
+}
+function pickMatForItem(iid, matId){
+  const mat = state.materialLibrary.find(m=>m.id===matId);
+  if(!mat) return;
+  $(`mat_${iid}`).value = mat.name;
+  $(`matResults_${iid}`).innerHTML = '';
+  if(mat.type==='roll'){
+    if(mat.t_um!=null && $(`t_${iid}`)) $(`t_${iid}`).value = mat.t_um;
+    if(mat.L_total!=null && $(`L_${iid}`)) $(`L_${iid}`).value = mat.L_total;
+    if(mat.core_mm!=null){
+      const mid = findMachineIdByItem_(iid);
+      const pid = mid ? findProductIdByItem_(mid, iid) : null;
+      const it = (mid && pid) ? findItem(mid, pid, iid) : null;
+      if(it) it.core_mm = mat.core_mm;
+      const btn103 = document.querySelector(`[data-act="core103"][data-i="${iid}"]`);
+      const btn182 = document.querySelector(`[data-act="core182"][data-i="${iid}"]`);
+      if(btn103 && btn182){
+        if(mat.core_mm===103){ btn103.className='btn btn-blue'; btn182.className='btn btn-ghost'; }
+        else if(mat.core_mm===182){ btn182.className='btn btn-blue'; btn103.className='btn btn-ghost'; }
+      }
+    }
+  }
+}
 
 // ---- 클릭 위임 ----
 document.addEventListener('input', (e)=>{
