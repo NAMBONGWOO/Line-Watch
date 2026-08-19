@@ -1207,11 +1207,11 @@ function renderMaterialModal(editId, templateData){
       t_um: selType==='roll' ? (parseFloat($('newMatT').value)||null) : null,
       core_mm: selType==='roll' ? selCore : null,
       L_total: selType==='roll' ? (parseFloat($('newMatL').value)||null) : null };
-    if(existingMat){ Object.assign(existingMat, entry); }
-    else{
-      const dup = state.materialLibrary.find(m=>m.name===name);
-      if(dup) Object.assign(dup, entry);
-      else state.materialLibrary.push(Object.assign({ id:uid('mat') }, entry));
+    if(existingMat){
+      Object.assign(existingMat, entry);
+    }else{
+      if(state.materialLibrary.some(m=>m.name===name) && !confirm(`"${name}" 이름이 이미 있습니다. 그래도 새 자재로 추가할까요? (취소하면 저장 안 됨)`)) return;
+      state.materialLibrary.push(Object.assign({ id:uid('mat') }, entry));
     }
     saveState(); renderAll(); closeModal('materialModal');
   };
@@ -1280,9 +1280,8 @@ function renderPresetBuilderModal(editId, templateData){
       existingPreset.name = name;
       existingPreset.materials = materials;
     }else{
-      const dup = state.presets.find(p=>p.name===name);
-      if(dup) dup.materials = materials;
-      else state.presets.push({ id:uid('preset'), name, materials });
+      if(state.presets.some(p=>p.name===name) && !confirm(`"${name}" 이름이 이미 있습니다. 그래도 새 프리셋으로 추가할까요? (취소하면 저장 안 됨)`)) return;
+      state.presets.push({ id:uid('preset'), name, materials });
     }
     saveState(); renderAll(); closeModal('presetBuilderModal');
     alert('제품 프리셋이 저장되었습니다.');
