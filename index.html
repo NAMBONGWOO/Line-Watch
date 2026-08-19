@@ -141,13 +141,14 @@
   .completed-body{ padding:0 12px 10px; }
   @media (min-width: 768px){
     .modal{ max-width:440px; }
-    body{ max-width:900px; padding:24px 28px 100px; }
-    .bottom-tabs{ max-width:900px; }
+    body{ max-width:1140px; padding:24px 28px 100px; }
+    .bottom-tabs{ max-width:1140px; }
     .tab-btn{ font-size:.9rem; padding:18px 4px 16px; }
-    #machines-container{ display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
-    #machines-container details.machine{ margin-bottom:0; }
-    #summary-list{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:start; }
-    #summary-list .machine-summary-group{ margin-bottom:0; }
+    #machines-container{
+      display:flex; overflow-x:auto; gap:14px; padding-bottom:10px; scroll-snap-type:x proximity;
+      -webkit-overflow-scrolling:touch;
+    }
+    #machines-container details.machine{ flex:0 0 380px; margin-bottom:0; scroll-snap-align:start; }
     .item-grid{ grid-template-columns:repeat(3, 1fr); }
     .row2{ grid-template-columns:1fr 1fr; }
     h1{ font-size:1.7rem; }
@@ -155,9 +156,7 @@
     .sum-row{ padding:11px; }
   }
   @media (min-width: 1100px){
-    body{ max-width:1140px; }
-    #machines-container{ grid-template-columns:1fr 1fr 1fr; }
-    #summary-list{ grid-template-columns:1fr 1fr 1fr; }
+    #machines-container details.machine{ flex-basis:420px; }
     .item-grid{ grid-template-columns:repeat(2, 1fr); }
   }
 </style>
