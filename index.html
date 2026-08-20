@@ -93,14 +93,14 @@
 
   .section-label{ font-size:.74rem; color:var(--text-dim); margin:10px 0 7px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
   .item-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
-  .item-btn{ padding:8px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; }
+  .item-btn{ padding:8px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; min-width:0; width:100%; overflow:hidden; }
   .item-btn.soon{ background:#fef8e6; border-color:var(--amber); }
   .item-btn.urgent{ background:#fce5e5; border-color:var(--warn); }
   .item-btn-name{ font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .item-btn-info{ font-size:.72rem; color:var(--text-dim); line-height:1.3; }
   .item-btn.urgent .item-btn-info{ color:var(--warn); font-weight:600; }
   .item-btn.soon .item-btn-info{ color:#b3820f; font-weight:600; }
-  .item-btn-detail{ display:block; font-size:.68rem; color:var(--text-dim); margin-top:3px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .item-btn-detail{ display:block; font-size:.68rem; color:var(--text-dim); margin-top:2px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
 
   .btn-add{ background:transparent; color:var(--blue); border:1.5px dashed var(--blue); border-radius:9px; padding:8px; width:100%; font-weight:800; cursor:pointer; font-size:.82rem; margin-bottom:8px;}
   .btn{ padding:8px; border:0; border-radius:8px; font-weight:800; cursor:pointer; font-size:.82rem; }
@@ -169,7 +169,6 @@
     h1{ font-size:1.7rem; }
     .card, .machine-body{ padding:16px; }
     .sum-row{ padding:11px; }
-    .item-btn-detail{ white-space:normal; }
   }
   @media (min-width: 1100px){
     #nextCheckCard{ width:360px; }
@@ -702,27 +701,22 @@ function productHTML(m, p, showAddProduct){
   const refNow = nowFor(m);
 
   function itemButton(it){
-    let detail = '';
-    const matName = it.materialName ? it.materialName.slice(0,16) : '';
+    const matName = it.materialName || '';
+    let statusLine = '';
     if(it.type==='roll'){
       if(it.rollTarget){
         const liveM = liveRemainM(it, refNow, p.speed);
-        detail = `${matName?matName+' · ':''}${fmtM(liveM)} · ${fmtCountdown(it.rollTarget, refNow, m.paused).text}`;
-      }else if(matName){
-        detail = matName;
+        statusLine = `${fmtM(liveM)} · ${fmtCountdown(it.rollTarget, refNow, m.paused).text}`;
       }
     }else if(it.type==='container'){
-      if(it.target){
-        detail = `${matName?matName+' · ':''}${fmtCountdown(it.target, refNow, m.paused).text}`;
-      }else if(matName){
-        detail = matName;
-      }
+      if(it.target) statusLine = fmtCountdown(it.target, refNow, m.paused).text;
     }else{
-      detail = it.note ? it.note.slice(0,24) : (matName||'');
+      statusLine = it.note || '';
     }
     return `<button class="item-btn" data-act="openitem" data-m="${m.id}" data-p="${p.id}" data-i="${it.id}" style="border:none; padding:0; cursor:pointer;">
       <div class="item-btn-name">${it.label}</div>
-      ${detail ? `<div class="item-btn-detail">${detail}</div>` : ''}
+      ${matName ? `<div class="item-btn-detail">${matName}</div>` : ''}
+      ${statusLine ? `<div class="item-btn-detail">${statusLine}</div>` : ''}
     </button>`;
   }
 
