@@ -96,10 +96,11 @@
   .item-btn{ padding:8px; border-radius:8px; border:1.5px solid; cursor:pointer; background:#e5edf9; border-color:#2f6fc4; text-align:center; }
   .item-btn.soon{ background:#fef8e6; border-color:var(--amber); }
   .item-btn.urgent{ background:#fce5e5; border-color:var(--warn); }
-  .item-btn-name{ font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .item-btn-name{ font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .item-btn-info{ font-size:.72rem; color:var(--text-dim); line-height:1.3; }
   .item-btn.urgent .item-btn-info{ color:var(--warn); font-weight:600; }
   .item-btn.soon .item-btn-info{ color:#b3820f; font-weight:600; }
+  .item-btn-detail{ display:block; font-size:.68rem; color:var(--text-dim); margin-top:3px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .btn-add{ background:transparent; color:var(--blue); border:1.5px dashed var(--blue); border-radius:9px; padding:8px; width:100%; font-weight:800; cursor:pointer; font-size:.82rem; margin-bottom:8px;}
   .btn{ padding:8px; border:0; border-radius:8px; font-weight:800; cursor:pointer; font-size:.82rem; }
@@ -152,6 +153,12 @@
     body{ max-width:1140px; padding:24px 28px 100px; }
     .bottom-tabs{ max-width:1140px; }
     .tab-btn{ font-size:.9rem; padding:18px 4px 16px; }
+    #page-production{ display:flex; align-items:flex-start; gap:16px; }
+    #nextCheckCard{
+      position:sticky; top:16px; width:320px; flex-shrink:0;
+      max-height:calc(100vh - 130px); overflow-y:auto; margin-bottom:0;
+    }
+    #machines-region{ flex:1; min-width:0; }
     #machines-container{
       display:flex; overflow-x:auto; gap:14px; padding-bottom:10px; scroll-snap-type:x proximity;
       -webkit-overflow-scrolling:touch;
@@ -162,8 +169,10 @@
     h1{ font-size:1.7rem; }
     .card, .machine-body{ padding:16px; }
     .sum-row{ padding:11px; }
+    .item-btn-detail{ white-space:normal; }
   }
   @media (min-width: 1100px){
+    #nextCheckCard{ width:360px; }
     #machines-container details.machine{ flex-basis:420px; }
     .item-grid{ grid-template-columns:repeat(2, 1fr); }
   }
@@ -180,13 +189,15 @@
 
   <!-- ===== 생산 페이지 ===== -->
   <div class="page" id="page-production">
-    <div class="card">
-      <h2>지금 확인할 순서</h2>
+    <div class="card" id="nextCheckCard">
+      <h2 style="color:var(--warn);">Next Check</h2>
       <div id="summary-list"><div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div></div>
     </div>
 
-    <div id="machines-container"></div>
-    <button class="btn-add" id="add-machine">+ 기계 추가</button>
+    <div id="machines-region">
+      <div id="machines-container"></div>
+      <button class="btn-add" id="add-machine">+ 기계 추가</button>
+    </div>
   </div>
 
   <!-- ===== 이력 페이지 ===== -->
@@ -691,8 +702,27 @@ function productHTML(m, p, showAddProduct){
   const refNow = nowFor(m);
 
   function itemButton(it){
+    let detail = '';
+    const matName = it.materialName ? it.materialName.slice(0,16) : '';
+    if(it.type==='roll'){
+      if(it.rollTarget){
+        const liveM = liveRemainM(it, refNow, p.speed);
+        detail = `${matName?matName+' · ':''}${fmtM(liveM)} · ${fmtCountdown(it.rollTarget, refNow, m.paused).text}`;
+      }else if(matName){
+        detail = matName;
+      }
+    }else if(it.type==='container'){
+      if(it.target){
+        detail = `${matName?matName+' · ':''}${fmtCountdown(it.target, refNow, m.paused).text}`;
+      }else if(matName){
+        detail = matName;
+      }
+    }else{
+      detail = it.note ? it.note.slice(0,24) : (matName||'');
+    }
     return `<button class="item-btn" data-act="openitem" data-m="${m.id}" data-p="${p.id}" data-i="${it.id}" style="border:none; padding:0; cursor:pointer;">
       <div class="item-btn-name">${it.label}</div>
+      ${detail ? `<div class="item-btn-detail">${detail}</div>` : ''}
     </button>`;
   }
 
