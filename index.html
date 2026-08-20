@@ -30,6 +30,14 @@
   .ac-item{ padding:8px 10px; font-size:.82rem; cursor:pointer; border-bottom:1px solid var(--line); background:#fff; }
   .ac-item:last-child{ border-bottom:0; }
   .ac-item.ac-empty{ color:var(--text-dim); cursor:default; }
+  body.readonly .btn, body.readonly .btn-add, body.readonly .btn-compact, body.readonly .mini-btn,
+  body.readonly .pause-icon-btn, body.readonly .history-btn,
+  body.readonly select, body.readonly input[type=number]{
+    pointer-events:none; opacity:.45;
+  }
+  body.readonly #auth-logged-out, body.readonly #auth-logged-out *{
+    pointer-events:auto; opacity:1;
+  }
 
   .card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:8px; box-shadow:0 1px 3px rgba(30,50,80,.06); }
   .card h2{ font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); margin:0 0 12px; font-weight:800; }
@@ -310,6 +318,14 @@
     <div class="modal">
       <div class="modal-header"><span>제품 프리셋 추가</span><button class="modal-close-x" onclick="closeModal('presetBuilderModal')">✕</button></div>
       <div class="modal-body" id="presetBuilderModalBody"></div>
+    </div>
+  </div>
+
+  <!-- 이력 수정 모달 -->
+  <div class="modal-overlay" id="histEditModal">
+    <div class="modal">
+      <div class="modal-header"><span>이력 수정</span><button class="modal-close-x" onclick="closeModal('histEditModal')">✕</button></div>
+      <div class="modal-body" id="histEditModalBody"></div>
     </div>
   </div>
 
@@ -956,6 +972,67 @@ function entriesForDay(timestamp){
   entries.sort((a,b)=>a.time-b.time);
   return entries;
 }
+function renderHistEditModal(mid, pid, hid){
+  const p = findProduct(mid, pid);
+  const h = p.histories.find(hh=>hh.id===hid);
+  if(!h) return;
+  const d = new Date(h.time);
+  const timeStr = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const typeLabel = h.type==='lot' ? '로트 완료' : h.type==='replace' ? '자재 교체' : '생산 종료';
+
+  let fieldsHtml = '';
+  if(h.type==='lot'){
+    fieldsHtml = `
+      <div class="input-group"><label class="input-label">로트번호</label><input type="text" id="he_lotNumber" value="${h.lotNumber||''}"></div>
+      <div class="input-group"><label class="input-label">권취 길이 (m)</label><input type="number" id="he_amount" value="${parseFloat(h.amount)||''}"></div>
+      <div class="input-group"><label class="input-label">특이사항</label><input type="text" id="he_note" value="${h.note||''}"></div>
+    `;
+  }else if(h.type==='replace'){
+    fieldsHtml = `
+      <div class="input-group"><label class="input-label">위치</label><input type="text" id="he_label" value="${h.label||''}"></div>
+      <div class="input-group"><label class="input-label">자재명</label><input type="text" id="he_materialName" value="${h.materialName||''}"></div>
+      <div class="input-group"><label class="input-label">사용량</label><input type="text" id="he_amount" value="${h.amount||''}"></div>
+      <div class="input-group"><label class="input-label">원자재 로트번호</label><input type="text" id="he_matLot" value="${h.matLot||''}"></div>
+      <div class="input-group"><label class="input-label">특이사항</label><input type="text" id="he_note" value="${h.note||''}"></div>
+    `;
+  }else{
+    fieldsHtml = `
+      <div class="input-group"><label class="input-label">제품명</label><input type="text" id="he_label" value="${h.label||''}"></div>
+      <div class="input-group"><label class="input-label">수량</label><input type="text" id="he_amount" value="${h.amount||''}"></div>
+    `;
+  }
+
+  $('histEditModalBody').innerHTML = `
+    <div class="btn-hint" style="text-align:left; color:var(--text-dim); margin-bottom:10px;">${typeLabel}</div>
+    ${fieldsHtml}
+    <div class="input-group"><label class="input-label">시간</label><input type="datetime-local" id="he_time" value="${timeStr}"></div>
+    <div class="modal-buttons">
+      <button class="btn btn-blue" id="saveHistEditBtn">저장</button>
+      <button class="btn btn-ghost" onclick="closeModal('histEditModal')">취소</button>
+    </div>
+  `;
+  $('saveHistEditBtn').onclick = ()=>{
+    if(h.type==='lot'){
+      h.lotNumber = $('he_lotNumber').value.trim();
+      const amt = parseFloat($('he_amount').value);
+      h.amount = (amt>=0) ? amt+'m' : '';
+      h.note = $('he_note').value.trim();
+    }else if(h.type==='replace'){
+      h.label = $('he_label').value.trim();
+      h.materialName = $('he_materialName').value.trim();
+      h.amount = $('he_amount').value.trim();
+      h.matLot = $('he_matLot').value.trim();
+      h.note = $('he_note').value.trim();
+    }else{
+      h.label = $('he_label').value.trim();
+      h.amount = $('he_amount').value.trim();
+    }
+    const parsed = new Date($('he_time').value);
+    if(!isNaN(parsed.getTime())) h.time = parsed.getTime();
+    saveState(); renderAll(); closeModal('histEditModal');
+  };
+}
+
 function renderDailyClosures(){
   const el = $('dailyClosuresList');
   if(!el) return;
@@ -1622,20 +1699,8 @@ document.addEventListener('click', (e)=>{
     }
   }
   else if(act==='edithist'){
-    const p = findProduct(mid, pid);
-    const h = p.histories.find(hh=>hh.id===hid);
-    if(!h) return;
-    const newAmount = prompt('수정할 수량을 입력하세요', h.amount);
-    if(newAmount===null) return;
-    const d = new Date(h.time);
-    const defaultTimeStr = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-    const newTimeStr = prompt('시간을 수정하세요 (YYYY-MM-DD HH:MM)', defaultTimeStr);
-    if(newTimeStr===null) return;
-    if(newAmount.trim()) h.amount = newAmount.trim();
-    const parsed = new Date(newTimeStr.trim().replace(' ','T'));
-    if(!isNaN(parsed.getTime())) h.time = parsed.getTime();
-    else alert('시간 형식을 확인 못해 시간은 반영되지 않았습니다 (수량만 반영됨).');
-    saveState(); renderAll();
+    renderHistEditModal(mid, pid, hid);
+    openModal('histEditModal');
   }
   else if(act==='delhist'){
     if(confirm('이 이력을 삭제하시겠습니까?')){
