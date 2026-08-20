@@ -1027,7 +1027,10 @@ function renderItemModal(mid, pid, iid){
           <button class="btn ${it.core_mm===182?'btn-blue':'btn-ghost'}" data-act="core182" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="padding:8px;">182mm</button>
         </div>
       </div>
-      <div class="btn-hint" style="text-align:left; margin-bottom:8px;">생산속도: ${p.speed??'미설정'} m/min (제품 공통값)</div>
+      <div class="btn-hint" style="text-align:left; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+        <span>생산속도: ${p.speed??'미설정'} m/min (제품 공통값)</span>
+        <button type="button" class="history-btn" data-act="editproductspeed" data-m="${mid}" data-p="${pid}" data-i="${iid}">수정</button>
+      </div>
       <button class="btn btn-ghost" data-act="calcroll" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">측정값 업데이트</button>
       <div class="btn-hint">이력 안 남음 · 현재 잔량만 재계산</div>
       ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow, p.speed))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
@@ -1124,11 +1127,12 @@ function renderProductModalPresetList(mid){
 function renderProductModalConfirm(mid, presetId){
   const preset = presetId ? state.presets.find(p=>p.id===presetId) : null;
   $('productModalBody').innerHTML = `
-    <div class="input-group"><label class="input-label">제품명</label><input type="text" id="newProductName" value="${preset?preset.name:''}"></div>
+    <div class="input-group"><label class="input-label">제품명 <span style="color:var(--warn);">*</span></label><input type="text" id="newProductName" value="${preset?preset.name:''}"></div>
     <div class="row2">
       <div class="input-group"><label class="input-label">목표 수량 (작업지시서, m)</label><input type="number" id="newProductQty" placeholder=""></div>
-      <div class="input-group"><label class="input-label">생산속도 (m/min)</label><input type="number" id="newProductSpeed" placeholder=""></div>
+      <div class="input-group"><label class="input-label">생산속도 (m/min) <span style="color:var(--warn);">*</span></label><input type="number" id="newProductSpeed" placeholder="필수"></div>
     </div>
+    <div class="btn-hint" style="text-align:left; color:var(--text-dim);">생산속도가 있어야 원단 잔량·교체 예정시간이 계산됩니다.</div>
     ${preset ? `<div class="section-label">자동 생성될 항목</div>` + preset.materials.map(mt=>`
       <div class="history-item"><div class="history-text"><strong>${mt.position}</strong><br>${mt.materialName||''} · ${mt.type}</div></div>
     `).join('') : ''}
@@ -1140,8 +1144,9 @@ function renderProductModalConfirm(mid, presetId){
   $('confirmCreateProduct').onclick = ()=>{
     const name = $('newProductName').value.trim();
     if(!name){ alert('제품명을 입력하세요.'); return; }
-    const qty = parseFloat($('newProductQty').value) || null;
     const speed = parseFloat($('newProductSpeed').value) || null;
+    if(!(speed>0)){ alert('생산속도(m/min)는 필수입니다. 이게 있어야 원단 잔량과 교체 예정시간이 계산됩니다.'); return; }
+    const qty = parseFloat($('newProductQty').value) || null;
     const product = defaultProduct(name, qty, speed);
     if(preset) product.items = preset.materials.map(itemFromPresetMaterial);
     findMachine(mid).products.push(product);
@@ -1660,6 +1665,15 @@ document.addEventListener('click', (e)=>{
       state.presets = state.presets.filter(p=>p.id!==presetId);
       saveState(); renderAll();
     }
+  }
+  else if(act==='editproductspeed'){
+    const p = findProduct(mid, pid);
+    const newSpeed = prompt('생산속도 (m/min)를 입력하세요', p.speed||'');
+    if(newSpeed===null) return;
+    const val = parseFloat(newSpeed);
+    if(!(val>0)){ alert('올바른 숫자를 입력해주세요.'); return; }
+    p.speed = val;
+    saveState(); renderAll(); renderItemModal(mid, pid, iid);
   }
   else if(act==='setlotcode'){
     const m = findMachine(mid);
