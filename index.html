@@ -148,12 +148,14 @@
   .completed-product summary::-webkit-details-marker{ display:none; }
   .completed-meta{ font-size:.7rem; color:var(--text-dim); font-weight:600; white-space:nowrap; }
   .completed-body{ padding:0 12px 10px; }
+  .page{ display:none; }
+  .page.active{ display:block; }
   @media (min-width: 768px){
     .modal{ max-width:440px; }
     body{ max-width:1140px; padding:24px 28px 100px; }
     .bottom-tabs{ max-width:1140px; }
     .tab-btn{ font-size:.9rem; padding:18px 4px 16px; }
-    #page-production{ display:flex; align-items:flex-start; gap:16px; }
+    #page-production.active{ display:flex; align-items:flex-start; gap:16px; }
     #nextCheckCard{
       position:sticky; top:16px; width:320px; flex-shrink:0;
       max-height:calc(100vh - 130px); overflow-y:auto; margin-bottom:0;
@@ -171,9 +173,17 @@
     .sum-row{ padding:11px; }
   }
   @media (min-width: 1100px){
+    body{ max-width:1300px; }
+    .bottom-tabs{ max-width:1300px; }
     #nextCheckCard{ width:360px; }
     #machines-container details.machine{ flex-basis:420px; }
     .item-grid{ grid-template-columns:repeat(2, 1fr); }
+  }
+  @media (min-width: 1400px){
+    body{ max-width:1600px; }
+    .bottom-tabs{ max-width:1600px; }
+    #nextCheckCard{ width:400px; }
+    #machines-container details.machine{ flex-basis:460px; }
   }
 </style>
 </head>
@@ -187,7 +197,7 @@
   </div>
 
   <!-- ===== 생산 페이지 ===== -->
-  <div class="page" id="page-production">
+  <div class="page active" id="page-production">
     <div class="card" id="nextCheckCard">
       <h2 style="color:var(--warn);">Next Check</h2>
       <div id="summary-list"><div class="empty-msg">기계와 제품을 추가하고 계산하면 여기에 표시됩니다</div></div>
@@ -200,7 +210,7 @@
   </div>
 
   <!-- ===== 이력 페이지 ===== -->
-  <div class="page" id="page-history" style="display:none;">
+  <div class="page" id="page-history">
     <div class="card">
       <h2>이력 조회</h2>
       <div class="row2">
@@ -223,7 +233,7 @@
   </div>
 
   <!-- ===== 등록 페이지 ===== -->
-  <div class="page" id="page-register" style="display:none;">
+  <div class="page" id="page-register">
     <div class="card" id="auth-logged-out" style="display:flex; gap:8px; flex-wrap:wrap;">
       <input type="email" id="login-email" placeholder="이메일" style="flex:1; min-width:100px;">
       <input type="password" id="login-pw" placeholder="비밀번호" style="flex:1; min-width:100px;">
@@ -269,7 +279,7 @@
   </div>
 
   <!-- ===== 계산기 페이지 ===== -->
-  <div class="page" id="page-calc" style="display:none;">
+  <div class="page" id="page-calc">
     <div class="card">
       <h2>재고 원단 잔량 계산기</h2>
       <div class="input-group">
@@ -498,8 +508,8 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    document.querySelectorAll('.page').forEach(p=>p.style.display='none');
-    $(`page-${btn.dataset.page}`).style.display='block';
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    $(`page-${btn.dataset.page}`).classList.add('active');
     if(btn.dataset.page==='history') renderHistoryPage();
   });
 });
@@ -1134,7 +1144,7 @@ function renderItemModal(mid, pid, iid){
       </div>
       <button class="btn btn-ghost" data-act="calcroll" data-m="${mid}" data-p="${pid}" data-i="${iid}" style="width:100%;">측정값 업데이트</button>
       <div class="btn-hint">이력 안 남음 · 현재 잔량만 재계산</div>
-      ${it.rollTarget ? `<div class="result-box">예상 잔량: ${fmtM(liveRemainM(it, refNow, p.speed))}<br>약 ${Math.floor((it.rollTarget-refNow)/60000)}분 후 교체</div>` : ''}
+      <div class="result-box" id="rollResultBox_${iid}" style="${it.rollTarget?'':'display:none;'}">예상 잔량: ${fmtM(liveRemainM(it, refNow, p.speed))}<br>약 ${it.rollTarget?Math.floor((it.rollTarget-refNow)/60000):'–'}분 후 교체</div>
       <div class="section-label">체크포인트</div>
       <div class="history-list">${cpListHtml}</div>
       <div class="row2">
@@ -1505,6 +1515,11 @@ document.addEventListener('input', (e)=>{
     if(!mid) return;
     const it = findItem(mid, findProductIdByItem_(mid, iid), iid);
     if(!it) return;
+    const btn103v = document.querySelector(`[data-act="core103"][data-i="${iid}"]`);
+    const btn182v = document.querySelector(`[data-act="core182"][data-i="${iid}"]`);
+    const coreMm = (btn103v && btn103v.classList.contains('btn-blue')) ? 103
+      : (btn182v && btn182v.classList.contains('btn-blue')) ? 182
+      : it.core_mm;
     const t = parseFloat($(`t_${iid}`).value);
     const L = parseFloat($(`L_${iid}`).value);
     const H = parseFloat($(`H_${iid}`).value);
@@ -1513,14 +1528,24 @@ document.addEventListener('input', (e)=>{
     const LapplyBtn = $(`LapplyBtn_${iid}`);
     const HapplyBtn = $(`HapplyBtn_${iid}`);
     if(LpreviewText){
-      const predH = H_fromLength(it.core_mm, t, L);
+      const predH = H_fromLength(coreMm, t, L);
       LpreviewText.textContent = predH!=null ? `예상 쌓인두께: ${predH.toFixed(1)}mm` : '–';
       if(LapplyBtn){ LapplyBtn.disabled = predH==null; LapplyBtn.dataset.value = predH!=null ? predH.toFixed(1) : ''; }
     }
     if(HpreviewText){
-      const predL = rollRemainingM(it.core_mm, t, H);
+      const predL = rollRemainingM(coreMm, t, H);
       HpreviewText.textContent = predL!=null ? `예상 초기총길이: ${predL.toLocaleString(undefined,{maximumFractionDigits:1})}m` : '–';
       if(HapplyBtn){ HapplyBtn.disabled = predL==null; HapplyBtn.dataset.value = predL!=null ? predL.toFixed(1) : ''; }
+    }
+    const resultBox = $(`rollResultBox_${iid}`);
+    if(resultBox){
+      const liveL = rollRemainingM(coreMm, t, H);
+      if(liveL!=null){
+        const speed = (findProductIdByItem_(mid, iid) && findProduct(mid, findProductIdByItem_(mid, iid)).speed) || null;
+        const minsLeft = speed>0 ? Math.floor(liveL/speed) : null;
+        resultBox.style.display = '';
+        resultBox.innerHTML = `예상 잔량: ${fmtM(liveL)}${minsLeft!=null?`<br>약 ${minsLeft}분 후 교체 (현재 입력값 기준)`:'<br>생산속도 필요'}`;
+      }
     }
   }
 });
@@ -1670,6 +1695,12 @@ document.addEventListener('click', (e)=>{
     const H = parseFloat($(`H_${iid}`).value);
     if(!(t_um>0) || !(H>=0)){ alert('값을 확인해주세요.'); return; }
     if(!(prod.speed>0)){ alert('제품의 생산속도가 설정되어 있지 않습니다. 제품 상세에서 먼저 설정해주세요.'); return; }
+    const btn103 = document.querySelector(`[data-act="core103"][data-i="${iid}"]`);
+    const btn182 = document.querySelector(`[data-act="core182"][data-i="${iid}"]`);
+    if(btn103 && btn182){
+      if(btn103.classList.contains('btn-blue')) it.core_mm = 103;
+      else if(btn182.classList.contains('btn-blue')) it.core_mm = 182;
+    }
     it.t_um=t_um; it.H=H;
     it.L_total = (L_total>0) ? L_total : null;
     const remainM = rollRemainingM(it.core_mm, t_um, H);
